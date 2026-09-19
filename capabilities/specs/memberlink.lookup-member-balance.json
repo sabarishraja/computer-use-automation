@@ -1,0 +1,242 @@
+{
+  "id": "memberlink.lookup-member-balance",
+  "version": "1.0.0",
+  "name": "Look up a member's share savings balance",
+  "description": "Given a 6-digit member number, open the member's record in MemberLink Core Servicing and return their name and current SHARE SAVINGS balance. Read-only: this capability never changes a record.",
+  "goal": "Sign on as the operator, look up member {{inputs.memberId}}, open their record, and read their name and their SHARE SAVINGS account balance.",
+  "entry": "{{env.baseUrl}}/t/summit/",
+  "maxSteps": 26,
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "description": "The member's 6-digit account number.",
+      "required": true,
+      "sensitivity": "identifier",
+      "pattern": "^\\d{6}$",
+      "example": "123456"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "memberName",
+      "type": "string",
+      "description": "The member's name as shown on the detail screen, in LAST, FIRST form.",
+      "sensitivity": "pii",
+      "required": true
+    },
+    {
+      "name": "savingsBalance",
+      "type": "money",
+      "description": "Current balance of the member's SHARE SAVINGS account, in USD.",
+      "sensitivity": "financial",
+      "required": true
+    }
+  ],
+  "outcomes": [
+    {
+      "code": "MEMBER_NOT_FOUND",
+      "description": "The member number is well-formed but no such member exists at this institution.",
+      "message": "No member record exists for {{inputs.memberId}}.",
+      "partialOutputs": [],
+      "probeInputs": {
+        "memberId": "000000"
+      }
+    },
+    {
+      "code": "MEMBER_RESTRICTED",
+      "description": "The member record exists but this operator is not authorised to view it.",
+      "message": "Access to member {{inputs.memberId}} is restricted for this operator.",
+      "partialOutputs": [],
+      "probeInputs": {
+        "memberId": "999999"
+      }
+    }
+  ],
+  "credentials": [
+    {
+      "envKey": "OPERATOR_ID",
+      "label": "Operator ID"
+    },
+    {
+      "envKey": "OPERATOR_PASSWORD",
+      "label": "Operator password"
+    }
+  ],
+  "discoveryInputs": {
+    "memberId": "123456"
+  },
+  "app": {
+    "application": {
+      "vendor": "memberlink",
+      "product": "core-servicing",
+      "versionRange": "3.x"
+    },
+    "surfaceKind": "web",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "policy": {
+      "allowedOrigins": [
+        "http://127.0.0.1:4173/t/summit"
+      ],
+      "allowedPathPrefixes": [],
+      "maxUnattendedRisk": "read",
+      "neverPersist": [
+        "memberName",
+        "savingsBalance"
+      ],
+      "requiresApprovalState": [
+        "approved"
+      ]
+    },
+    "globalRecovery": [
+      {
+        "id": "dismiss-maintenance-notice",
+        "description": "Clear the scheduled-maintenance interstitial that the app can interpose on any screen.",
+        "when": {
+          "kind": "textPresent",
+          "value": "Scheduled maintenance",
+          "match": "contains"
+        },
+        "do": [
+          {
+            "type": "click",
+            "target": {
+              "description": "Continue button on the maintenance notice",
+              "framePath": [
+                "*"
+              ],
+              "strategies": [
+                {
+                  "kind": "role",
+                  "role": "button",
+                  "name": "Continue",
+                  "match": "exact",
+                  "tier": "semantic"
+                }
+              ]
+            }
+          }
+        ],
+        "maxAttempts": 2,
+        "scope": "global"
+      },
+      {
+        "id": "acknowledge-disclosure",
+        "description": "Acknowledge the monitoring disclosure some institutions interpose after sign-on.",
+        "when": {
+          "kind": "textPresent",
+          "value": "Activity in this system is monitored",
+          "match": "contains"
+        },
+        "do": [
+          {
+            "type": "click",
+            "target": {
+              "description": "Acknowledge button on the disclosure screen",
+              "framePath": [
+                "*"
+              ],
+              "strategies": [
+                {
+                  "kind": "role",
+                  "role": "button",
+                  "name": "Acknowledge",
+                  "match": "exact",
+                  "tier": "semantic"
+                }
+              ]
+            }
+          }
+        ],
+        "maxAttempts": 2,
+        "scope": "global"
+      },
+      {
+        "id": "re-authenticate",
+        "description": "Sign on again after the application expires the session mid-run.",
+        "when": {
+          "kind": "textPresent",
+          "value": "Your session has expired",
+          "match": "contains"
+        },
+        "do": [
+          {
+            "type": "fill",
+            "target": {
+              "description": "Operator ID field on the sign-on screen",
+              "framePath": [
+                "*"
+              ],
+              "strategies": [
+                {
+                  "kind": "nearText",
+                  "anchor": "Operator ID:",
+                  "anchorMatch": "exact",
+                  "direction": "following",
+                  "control": "textbox",
+                  "ordinal": 1,
+                  "tier": "structural"
+                },
+                {
+                  "kind": "fieldName",
+                  "name": "opid",
+                  "tier": "structural"
+                }
+              ]
+            },
+            "value": "{{env.secret_OPERATOR_ID}}"
+          },
+          {
+            "type": "fill",
+            "target": {
+              "description": "Password field on the sign-on screen",
+              "framePath": [
+                "*"
+              ],
+              "strategies": [
+                {
+                  "kind": "nearText",
+                  "anchor": "Password:",
+                  "anchorMatch": "exact",
+                  "direction": "following",
+                  "control": "textbox",
+                  "ordinal": 1,
+                  "tier": "structural"
+                },
+                {
+                  "kind": "fieldName",
+                  "name": "pw",
+                  "tier": "structural"
+                }
+              ]
+            },
+            "value": "{{env.secret_OPERATOR_PASSWORD}}"
+          },
+          {
+            "type": "click",
+            "target": {
+              "description": "Sign On button",
+              "framePath": [
+                "*"
+              ],
+              "strategies": [
+                {
+                  "kind": "role",
+                  "role": "button",
+                  "name": "Sign On",
+                  "match": "exact",
+                  "tier": "semantic"
+                }
+              ]
+            }
+          }
+        ],
+        "maxAttempts": 1,
+        "scope": "global"
+      }
+    ]
+  }
+}

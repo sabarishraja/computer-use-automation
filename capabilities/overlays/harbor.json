@@ -1,0 +1,24 @@
+{
+  "tenantId": "harbor",
+  "institution": "Harbor First Bank",
+  "productVersion": "3.4.2",
+  "entry": "{{env.baseUrl}}/t/harbor/",
+  "allowedOrigins": ["http://127.0.0.1:4173/t/harbor"],
+
+  "terms": {
+    "Member Search": "Customer Search",
+    "Member Detail": "Customer Detail",
+    "Member Number": "Customer Number",
+    "Current Balance": "Available Balance",
+    "New Search": "New Find",
+    "Member": "Customer",
+    "member": "customer",
+    "Search": "Find"
+  },
+
+  "locatorOverrides": {},
+  "extraRecovery": [],
+  "extraOutcomes": [],
+
+  "notes": "Harbor First Bank runs MemberLink 3.4.2 against the same screens as Summit's 3.1.7, configured with 'Customer' terminology and a 'Find' action label, and with the monitoring disclosure enabled after sign-on. The whole divergence is vocabulary plus one interstitial, so the overlay is a term map rather than a fork: no step is added, removed or reordered. The disclosure is already covered by the app profile's global recovery rules."
+}

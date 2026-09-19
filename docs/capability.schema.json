@@ -1,0 +1,1215 @@
+{
+  "$ref": "#/definitions/Capability",
+  "definitions": {
+    "Capability": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "1.0.0"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "approved",
+            "deprecated"
+          ],
+          "default": "draft"
+        },
+        "surface": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "web",
+                "desktop",
+                "terminal"
+              ]
+            },
+            "entry": {
+              "type": "string"
+            },
+            "application": {
+              "type": "object",
+              "properties": {
+                "vendor": {
+                  "type": "string"
+                },
+                "product": {
+                  "type": "string"
+                },
+                "versionRange": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "vendor",
+                "product",
+                "versionRange"
+              ],
+              "additionalProperties": false
+            },
+            "viewport": {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "integer"
+                },
+                "height": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "width",
+                "height"
+              ],
+              "additionalProperties": false,
+              "default": {
+                "width": 1280,
+                "height": 800
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "entry",
+            "application"
+          ],
+          "additionalProperties": false
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "money",
+                  "date"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean",
+                "default": true
+              },
+              "sensitivity": {
+                "type": "string",
+                "enum": [
+                  "public",
+                  "identifier",
+                  "financial",
+                  "pii",
+                  "secret"
+                ],
+                "default": "public"
+              },
+              "pattern": {
+                "type": "string"
+              },
+              "enum": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "default": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              "example": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+              },
+              "type": {
+                "$ref": "#/definitions/Capability/properties/inputs/items/properties/type"
+              },
+              "description": {
+                "type": "string"
+              },
+              "sensitivity": {
+                "$ref": "#/definitions/Capability/properties/inputs/items/properties/sensitivity",
+                "default": "public"
+              },
+              "required": {
+                "type": "boolean",
+                "default": true
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "intent": {
+                "type": "string"
+              },
+              "action": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "navigate"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "url"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "click"
+                      },
+                      "target": {
+                        "type": "object",
+                        "properties": {
+                          "description": {
+                            "type": "string"
+                          },
+                          "framePath": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "default": []
+                          },
+                          "strategies": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "tier": {
+                                      "type": "string",
+                                      "enum": [
+                                        "semantic",
+                                        "structural",
+                                        "positional",
+                                        "fragile"
+                                      ]
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "role"
+                                    },
+                                    "role": {
+                                      "type": "string",
+                                      "enum": [
+                                        "button",
+                                        "link",
+                                        "textbox",
+                                        "combobox",
+                                        "checkbox",
+                                        "radio",
+                                        "heading",
+                                        "cell",
+                                        "row",
+                                        "table",
+                                        "listitem",
+                                        "menuitem",
+                                        "tab",
+                                        "dialog",
+                                        "region"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "match": {
+                                      "type": "string",
+                                      "enum": [
+                                        "exact",
+                                        "contains",
+                                        "regex"
+                                      ],
+                                      "default": "exact"
+                                    }
+                                  },
+                                  "required": [
+                                    "tier",
+                                    "kind",
+                                    "role"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "tier": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/tier"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "label"
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    },
+                                    "match": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/match",
+                                      "default": "exact"
+                                    }
+                                  },
+                                  "required": [
+                                    "tier",
+                                    "kind",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "tier": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/tier"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "nearText"
+                                    },
+                                    "anchor": {
+                                      "type": "string"
+                                    },
+                                    "anchorMatch": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/match",
+                                      "default": "exact"
+                                    },
+                                    "direction": {
+                                      "type": "string",
+                                      "enum": [
+                                        "following",
+                                        "preceding"
+                                      ],
+                                      "default": "following"
+                                    },
+                                    "control": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/role"
+                                    },
+                                    "ordinal": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "default": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "tier",
+                                    "kind",
+                                    "anchor"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "tier": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/tier"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "text"
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    },
+                                    "match": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/match",
+                                      "default": "exact"
+                                    }
+                                  },
+                                  "required": [
+                                    "tier",
+                                    "kind",
+                                    "value"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "tier": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/tier"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "fieldName"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "tier",
+                                    "kind",
+                                    "name"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "tier": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/tier"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "tableCell"
+                                    },
+                                    "rowContains": {
+                                      "type": "string"
+                                    },
+                                    "column": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "integer",
+                                          "minimum": 0
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "tier",
+                                    "kind",
+                                    "rowContains",
+                                    "column"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "tier": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/tier"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "css"
+                                    },
+                                    "selector": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "tier",
+                                    "kind",
+                                    "selector"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "tier": {
+                                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/tier"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "xpath"
+                                    },
+                                    "expression": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "tier",
+                                    "kind",
+                                    "expression"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "minItems": 1
+                          }
+                        },
+                        "required": [
+                          "description",
+                          "strategies"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "target"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "fill"
+                      },
+                      "target": {
+                        "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "target",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "select"
+                      },
+                      "target": {
+                        "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "target",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "press"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "target": {
+                        "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "key"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "extract"
+                      },
+                      "target": {
+                        "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target"
+                      },
+                      "field": {
+                        "type": "string"
+                      },
+                      "transform": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "trim"
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "money"
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "number"
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "regex"
+                              },
+                              "pattern": {
+                                "type": "string"
+                              },
+                              "group": {
+                                "type": "integer",
+                                "default": 1
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "pattern"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "target",
+                      "field"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "waitFor"
+                      },
+                      "condition": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "urlMatches"
+                              },
+                              "pattern": {
+                                "type": "string"
+                              },
+                              "match": {
+                                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/match"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "pattern"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "textPresent"
+                              },
+                              "value": {
+                                "type": "string"
+                              },
+                              "match": {
+                                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/match"
+                              },
+                              "framePath": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "textAbsent"
+                              },
+                              "value": {
+                                "type": "string"
+                              },
+                              "match": {
+                                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items/anyOf/0/properties/match"
+                              },
+                              "framePath": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "visible"
+                              },
+                              "locator": {
+                                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "locator"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "notVisible"
+                              },
+                              "locator": {
+                                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "locator"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "count"
+                              },
+                              "locator": {
+                                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target"
+                              },
+                              "min": {
+                                "type": "number"
+                              },
+                              "max": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "locator"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "httpStatusAtLeast"
+                              },
+                              "status": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "all"
+                              },
+                              "of": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+                                }
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "of"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "any"
+                              },
+                              "of": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+                                }
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "of"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "not"
+                              },
+                              "of": {
+                                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "of"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "condition"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "assert"
+                      },
+                      "condition": {
+                        "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "condition"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "risk": {
+                "type": "string",
+                "enum": [
+                  "read",
+                  "write_reversible",
+                  "write_irreversible"
+                ],
+                "default": "read"
+              },
+              "precondition": {
+                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+              },
+              "checkpoint": {
+                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+              },
+              "recovery": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "when": {
+                      "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+                    },
+                    "do": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/Capability/properties/steps/items/properties/action"
+                      }
+                    },
+                    "maxAttempts": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 5,
+                      "default": 2
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "global",
+                        "step"
+                      ],
+                      "default": "global"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "description",
+                    "when",
+                    "do"
+                  ],
+                  "additionalProperties": false
+                },
+                "default": []
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 120000,
+                "default": 10000
+              },
+              "optional": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "required": [
+              "id",
+              "intent",
+              "action"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]*$"
+              },
+              "description": {
+                "type": "string"
+              },
+              "when": {
+                "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+              },
+              "message": {
+                "type": "string"
+              },
+              "partialOutputs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": []
+              }
+            },
+            "required": [
+              "code",
+              "description",
+              "when",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "globalRecovery": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Capability/properties/steps/items/properties/recovery/items"
+          },
+          "default": []
+        },
+        "successCondition": {
+          "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "allowedOrigins": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            },
+            "allowedPathPrefixes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "maxUnattendedRisk": {
+              "$ref": "#/definitions/Capability/properties/steps/items/properties/risk",
+              "default": "read"
+            },
+            "neverPersist": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "requiresApprovalState": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "approved",
+                  "deprecated"
+                ]
+              },
+              "default": [
+                "approved"
+              ]
+            }
+          },
+          "required": [
+            "allowedOrigins"
+          ],
+          "additionalProperties": false
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "recordedAt": {
+              "type": "string"
+            },
+            "recordedBy": {
+              "type": "string",
+              "enum": [
+                "llm-discovery",
+                "human",
+                "imported"
+              ]
+            },
+            "goal": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "discoveryRunId": {
+              "type": "string"
+            },
+            "transcriptDigest": {
+              "type": "string"
+            },
+            "humanEditedSteps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            }
+          },
+          "required": [
+            "recordedAt",
+            "recordedBy",
+            "goal"
+          ],
+          "additionalProperties": false
+        },
+        "tenantOverlays": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tenantId": {
+                "type": "string"
+              },
+              "institution": {
+                "type": "string"
+              },
+              "terms": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {}
+              },
+              "entry": {
+                "type": "string"
+              },
+              "productVersion": {
+                "type": "string"
+              },
+              "allowedOrigins": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": []
+              },
+              "locatorOverrides": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "framePath": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "prependStrategies": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/1/properties/target/properties/strategies/items"
+                      },
+                      "default": []
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "default": {}
+              },
+              "extraRecovery": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/Capability/properties/steps/items/properties/recovery/items"
+                },
+                "default": []
+              },
+              "extraOutcomes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/Capability/properties/outcomes/items"
+                },
+                "default": []
+              },
+              "notes": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tenantId"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "version",
+        "name",
+        "description",
+        "surface",
+        "steps",
+        "successCondition",
+        "policy",
+        "provenance"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

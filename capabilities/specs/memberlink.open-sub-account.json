@@ -1,0 +1,217 @@
+{
+  "id": "memberlink.open-sub-account",
+  "version": "1.0.0",
+  "name": "Open a sub-account and reach the confirmation screen",
+  "description": "Given a member number, an account type and an opening deposit, walk MemberLink to the sub-account confirmation screen and return the reference number. Stops at confirmation: posting the account is an irreversible step and is gated by policy.",
+  "goal": "Sign on as the operator, look up member {{inputs.memberId}}, start a new sub-account of the requested type with the requested opening deposit, and reach the confirmation screen. Do not post it.",
+  "entry": "{{env.baseUrl}}/t/summit/",
+  "maxSteps": 30,
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "description": "The member's 6-digit account number.",
+      "required": true,
+      "sensitivity": "identifier",
+      "pattern": "^\\d{6}$",
+      "example": "123456"
+    },
+    {
+      "name": "accountType",
+      "type": "string",
+      "description": "Product to open.",
+      "required": true,
+      "sensitivity": "public",
+      "enum": [
+        "SHARE SAVINGS",
+        "VACATION CLUB",
+        "CERTIFICATE"
+      ],
+      "example": "VACATION CLUB"
+    },
+    {
+      "name": "openingDeposit",
+      "type": "money",
+      "description": "Opening deposit in USD. Deposits of $1,000 or more require a supervisor override.",
+      "required": true,
+      "sensitivity": "financial",
+      "example": 250
+    }
+  ],
+  "outputs": [
+    {
+      "name": "reference",
+      "type": "string",
+      "description": "Reference number shown on the confirmation screen.",
+      "sensitivity": "public",
+      "required": true
+    }
+  ],
+  "outcomes": [
+    {
+      "code": "MEMBER_NOT_FOUND",
+      "description": "The member number is well-formed but no such member exists at this institution.",
+      "message": "No member record exists for {{inputs.memberId}}.",
+      "partialOutputs": [],
+      "probeInputs": {
+        "memberId": "000000",
+        "accountType": "VACATION CLUB",
+        "openingDeposit": "250"
+      }
+    }
+  ],
+  "credentials": [
+    {
+      "envKey": "OPERATOR_ID",
+      "label": "Operator ID"
+    },
+    {
+      "envKey": "OPERATOR_PASSWORD",
+      "label": "Operator password"
+    }
+  ],
+  "discoveryInputs": {
+    "memberId": "123456",
+    "accountType": "VACATION CLUB",
+    "openingDeposit": "250"
+  },
+  "app": {
+    "application": {
+      "vendor": "memberlink",
+      "product": "core-servicing",
+      "versionRange": "3.x"
+    },
+    "surfaceKind": "web",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "policy": {
+      "allowedOrigins": [
+        "http://127.0.0.1:4173/t/summit"
+      ],
+      "allowedPathPrefixes": [],
+      "maxUnattendedRisk": "write_reversible",
+      "neverPersist": [],
+      "requiresApprovalState": [
+        "approved"
+      ]
+    },
+    "globalRecovery": [
+      {
+        "id": "dismiss-maintenance-notice",
+        "description": "Clear the scheduled-maintenance interstitial that the app can interpose on any screen.",
+        "when": {
+          "kind": "textPresent",
+          "value": "Scheduled maintenance",
+          "match": "contains"
+        },
+        "do": [
+          {
+            "type": "click",
+            "target": {
+              "description": "Continue button on the maintenance notice",
+              "framePath": [
+                "*"
+              ],
+              "strategies": [
+                {
+                  "kind": "role",
+                  "role": "button",
+                  "name": "Continue",
+                  "match": "exact",
+                  "tier": "semantic"
+                }
+              ]
+            }
+          }
+        ],
+        "maxAttempts": 2,
+        "scope": "global"
+      },
+      {
+        "id": "re-authenticate",
+        "description": "Sign on again after the application expires the session mid-run.",
+        "when": {
+          "kind": "textPresent",
+          "value": "Your session has expired",
+          "match": "contains"
+        },
+        "do": [
+          {
+            "type": "fill",
+            "target": {
+              "description": "Operator ID field on the sign-on screen",
+              "framePath": [
+                "*"
+              ],
+              "strategies": [
+                {
+                  "kind": "nearText",
+                  "anchor": "Operator ID:",
+                  "anchorMatch": "exact",
+                  "direction": "following",
+                  "control": "textbox",
+                  "ordinal": 1,
+                  "tier": "structural"
+                },
+                {
+                  "kind": "fieldName",
+                  "name": "opid",
+                  "tier": "structural"
+                }
+              ]
+            },
+            "value": "{{env.secret_OPERATOR_ID}}"
+          },
+          {
+            "type": "fill",
+            "target": {
+              "description": "Password field on the sign-on screen",
+              "framePath": [
+                "*"
+              ],
+              "strategies": [
+                {
+                  "kind": "nearText",
+                  "anchor": "Password:",
+                  "anchorMatch": "exact",
+                  "direction": "following",
+                  "control": "textbox",
+                  "ordinal": 1,
+                  "tier": "structural"
+                },
+                {
+                  "kind": "fieldName",
+                  "name": "pw",
+                  "tier": "structural"
+                }
+              ]
+            },
+            "value": "{{env.secret_OPERATOR_PASSWORD}}"
+          },
+          {
+            "type": "click",
+            "target": {
+              "description": "Sign On button",
+              "framePath": [
+                "*"
+              ],
+              "strategies": [
+                {
+                  "kind": "role",
+                  "role": "button",
+                  "name": "Sign On",
+                  "match": "exact",
+                  "tier": "semantic"
+                }
+              ]
+            }
+          }
+        ],
+        "maxAttempts": 1,
+        "scope": "global"
+      }
+    ]
+  }
+}
