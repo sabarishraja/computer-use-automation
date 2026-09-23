@@ -56,6 +56,18 @@ export class Recorder {
     return this.steps.at(-1)?.id;
   }
 
+  /**
+   * A recorded write step that has not yet been proven. The artifact schema
+   * refuses such a step, so the loop has to collect the checkpoint while the
+   * screen is still on it — discovering the gap at save time would throw away
+   * the whole run.
+   */
+  unprovenWriteStep(): { id: string; risk: RiskClass; intent: string } | undefined {
+    const last = this.steps.at(-1);
+    if (!last || last.risk === 'read' || last.checkpoint) return undefined;
+    return { id: last.id, risk: last.risk, intent: last.intent };
+  }
+
   recordNavigate(url: string): Step {
     return this.push({
       intent: `Open ${this.templateUrl(url)}`,
@@ -201,7 +213,10 @@ export class Recorder {
 
     const errors = validateCapability(cap).filter((i) => i.level === 'error');
     if (errors.length > 0) {
-      throw new Error('the recorded capability is not valid:\n' + errors.map((e) => '  - ' + e.message).join('\n'));
+      // The rejected recording travels with the error. A discovery run costs a
+      // model call and several minutes; throwing the artifact away leaves a
+      // reviewer with nothing to read but prose about what went wrong.
+      throw new InvalidRecordingError(errors.map((e) => e.message), cap);
     }
     return cap;
   }
@@ -242,6 +257,20 @@ export class Recorder {
       if (String(value).length >= 2 && raw === String(value)) return `{{inputs.${name}}}`;
     }
     return raw;
+  }
+}
+
+/**
+ * Raised when a completed recording fails artifact validation. Carries the
+ * rejected draft so discovery can write it out for a human to inspect.
+ */
+export class InvalidRecordingError extends Error {
+  constructor(
+    readonly issues: string[],
+    readonly rejected: unknown,
+  ) {
+    super('the recorded capability is not valid:\n' + issues.map((m) => '  - ' + m).join('\n'));
+    this.name = 'InvalidRecordingError';
   }
 }
 

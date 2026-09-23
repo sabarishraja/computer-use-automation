@@ -104,6 +104,18 @@ export class RunLogger {
   }
 
   /**
+   * A recording that failed validation, written where a reviewer can read the
+   * steps the model actually produced instead of only the reason they were
+   * refused. It is deliberately NOT written to the capability store: an invalid
+   * artifact must never be loadable by replay.
+   */
+  writeRejectedCapability(capability: unknown): string {
+    const p = join(this.dir, 'rejected-capability.json');
+    writeFileSync(p, JSON.stringify(this.redactor.json(capability), null, 2) + '\n', 'utf8');
+    return p;
+  }
+
+  /**
    * The transcript is stored redacted and separately from the artifact, and the
    * artifact keeps only its digest. A capability must be reviewable without
    * anyone re-reading model prose, and the transcript may contain page content

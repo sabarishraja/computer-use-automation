@@ -124,6 +124,13 @@ export interface Surface {
 
   evaluate(condition: Condition, timeoutMs: number): Promise<{ held: boolean; detail: string }>;
 
+  /**
+   * All visible text on the surface, every frame concatenated. Used to decide
+   * whether wording is NEW — a checkpoint that was already readable before the
+   * action proves nothing about the action.
+   */
+  pageText(): Promise<string>;
+
   screenshot(path: string): Promise<string | undefined>;
 
   /** Serialised page state for post-mortem debugging. */

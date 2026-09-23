@@ -145,6 +145,21 @@ may never be outputs, and targets with only fragile strategies raise a warning. 
 load matters because the artifact is a file humans edit — a hand edit that breaks an invariant
 should fail loudly at load, not halfway through a live banking screen.
 
+**The write-step invariant is enforced during the run, not at save time.** Checking it only on
+save is too late: a recording that reaches `build()` with an unproven write step is discarded
+whole, after several minutes and a model call, and the screen that would have proved the step is
+long gone. So the loop refuses the model's *next* tool call while a recorded write step has no
+checkpoint, and asks for one on the screen the action just produced. A checkpoint must also be
+**new** wording. On this application "Open Sub-Account" is both the link you click and the title
+of the form it opens, so a checkpoint on it would hold even if the click did nothing — precisely
+the "replay reports success having changed nothing" failure the invariant exists to prevent. The
+loop compares the proving text against the screen captured immediately before the action and
+rejects anything that was already there. Both refusals are visible in the discovery transcripts
+under `evidence/`, with the model recovering in-run and choosing `"Opening Deposit:"` instead.
+A recording that still fails validation is written to its run directory as
+`rejected-capability.json` — never to the capability store, where replay could load it — so a
+reviewer reads the steps rather than only the complaint about them.
+
 **Versioning.** `<id>@<version>.json` in git, one file per version. A database was the obvious
 alternative and was rejected: the artifact's whole purpose is reviewability, and a file in git
 gets diff, blame, review and rollback for free. Two versions coexist, so a caller pinned to 1.0.0

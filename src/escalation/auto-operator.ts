@@ -33,6 +33,12 @@ export type AutoOperatorOptions = {
   playbooks: OperatorPlaybook[];
   /** Give up waiting for a ticket after this long. */
   timeoutMs: number;
+  /**
+   * Stop waiting early. The run itself knows when no further escalation can
+   * arrive; without this the poll loop holds the CLI open for the full
+   * timeout on every run that never escalates.
+   */
+  signal?: AbortSignal;
   pollMs?: number;
   log?: (msg: string) => void;
 };
@@ -44,7 +50,7 @@ export async function runAutoOperator(opts: AutoOperatorOptions): Promise<{ hand
   const seen = new Set<string>();
   let handled = 0;
 
-  while (Date.now() < deadline) {
+  while (Date.now() < deadline && !opts.signal?.aborted) {
     const tickets = (await getJson(`${opts.consoleBaseUrl}/api/tickets`).catch(() => [])) as Array<{
       ticketId: string;
       status: string;

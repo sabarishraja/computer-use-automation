@@ -64,6 +64,7 @@ async function main(): Promise<void> {
   if (result.status === 'failed') {
     console.error(`\n[discover] FAILED: ${result.reason}`);
     console.error(`[discover] evidence: ${result.evidenceDir}`);
+    if (result.rejectedPath) console.error(`[discover] rejected draft: ${result.rejectedPath}`);
     process.exit(1);
   }
 

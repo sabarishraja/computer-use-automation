@@ -434,6 +434,18 @@ export class WebSurface implements Surface {
     }
   }
 
+  async pageText(): Promise<string> {
+    const parts: string[] = [];
+    for (const f of this.page.frames()) {
+      const t = await f
+        .locator('body')
+        .innerText({ timeout: 1500 })
+        .catch(() => '');
+      if (t) parts.push(normalise(t));
+    }
+    return parts.join('\n');
+  }
+
   private async evaluateOnce(c: Condition): Promise<{ held: boolean; detail: string }> {
     switch (c.kind) {
       case 'urlMatches': {

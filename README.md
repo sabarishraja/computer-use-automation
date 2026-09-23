@@ -120,11 +120,16 @@ npm run replay -- --capability memberlink.lookup-member-balance --param memberId
 npm run replay -- --capability memberlink.lookup-member-balance --param memberId=123456 --chaos expire
 
 # hard failure: a structured, debuggable error with screenshot + DOM snapshot
-npm run replay -- --capability memberlink.lookup-member-balance --param memberId=123456 --chaos apperror
+npm run replay -- --capability memberlink.lookup-member-balance --param memberId=123456 --chaos apperror --operator none
 
 # caller error: rejected in milliseconds, before a browser is opened
 npm run replay -- --capability memberlink.lookup-member-balance --param memberId=abc
 ```
+
+`--operator none` is what makes the error case a *hard failure*. On the default `auto`, the engine
+first offers the screen to a human; the scripted supervisor holds no playbook for an HTTP 500 and
+releases the ticket as `abort`, so the run ends `operator_aborted` — correct behaviour, different
+demo.
 
 **7. Human-in-the-loop escalation.** Record the write capability, then replay it with a deposit
 above the branch limit so the app demands a supervisor override the automation cannot supply:

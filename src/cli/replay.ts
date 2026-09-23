@@ -79,13 +79,17 @@ async function main(): Promise<void> {
   const env: Record<string, string> = { baseUrl };
   for (const [k, v] of Object.entries(credentialsFromEnv(credentialKeys))) env[`secret_${k}`] = v;
 
-  // The scripted operator races the run: it waits for a ticket to appear.
+  // The scripted operator races the run: it waits for a ticket to appear. Once
+  // the run is over no ticket can arrive, so the race is cancelled rather than
+  // left to expire against its own timeout.
+  const operatorDone = new AbortController();
   const operatorTask =
     operatorMode === 'auto' && escalationEnabled
       ? runAutoOperator({
           consoleBaseUrl: operatorConsole.baseUrl,
           playbooks: playbooks(),
           timeoutMs: 120_000,
+          signal: operatorDone.signal,
           log: (m) => console.log(m),
         }).catch((e) => {
           console.error('[operator] ' + (e as Error).message);
@@ -106,6 +110,7 @@ async function main(): Promise<void> {
       : undefined,
   });
 
+  operatorDone.abort();
   await operatorTask;
   if (escalationEnabled) await operatorConsole.stop();
   await target.close();

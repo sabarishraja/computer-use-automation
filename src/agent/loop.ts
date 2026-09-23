@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { relative } from 'node:path';
 import type { CapabilitySpec } from './spec.js';
-import { Recorder, digest } from './recorder.js';
+import { InvalidRecordingError, Recorder, digest } from './recorder.js';
 import { WebSurface } from '../surface/web-playwright.js';
 import type { ControlDescriptor, Observation } from '../surface/types.js';
 import { PolicyEngine } from '../policy/guardrails.js';
@@ -26,7 +26,7 @@ export type DiscoveryOptions = {
 
 export type DiscoveryResult =
   | { status: 'recorded'; capability: Capability; runId: string; evidenceDir: string; transcriptPath: string }
-  | { status: 'failed'; reason: string; runId: string; evidenceDir: string };
+  | { status: 'failed'; reason: string; runId: string; evidenceDir: string; rejectedPath?: string };
 
 /**
  * ============================================================================
@@ -187,10 +187,24 @@ export async function discover(opts: DiscoveryOptions): Promise<DiscoveryResult>
   } catch (e) {
     logger.writeTranscript(transcript);
     logger.log({ type: 'run.end', status: 'failed', ms: logger.elapsedMs(), error: (e as Error).message });
-    return { status: 'failed', reason: (e as Error).message, runId: logger.runId, evidenceDir: logger.dir };
+    const rejectedPath = e instanceof InvalidRecordingError ? logger.writeRejectedCapability(e.rejected) : undefined;
+    return { status: 'failed', reason: (e as Error).message, runId: logger.runId, evidenceDir: logger.dir, rejectedPath };
   } finally {
     await surface.close();
   }
+}
+
+/**
+ * A write step must carry proof that it landed. Refusing the model's next tool
+ * call, while the screen that would prove it is still open, is the only point
+ * where the gap is cheap to close.
+ */
+function unprovenWriteMessage(step: { id: string; risk: string; intent: string }): string {
+  return (
+    `REJECTED: step "${step.id}" (${step.intent}) was recorded as ${step.risk} and has no checkpoint. ` +
+    `A write step without proof would let replay report success having changed nothing. ` +
+    `Call checkpoint with static wording from the screen it produced, then continue.`
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -214,6 +228,11 @@ type PhaseArgs = {
   recordSteps: boolean;
   finishToolName: 'finish' | 'record_outcome';
   outcomeCode?: string;
+  /**
+   * Text on screen immediately before the last recorded action. A checkpoint
+   * is only proof if its wording was not already there.
+   */
+  priorScreen?: { text: string };
 };
 
 async function runPhase(a: PhaseArgs): Promise<{ ok: true; steps: number } | { ok: false; reason: string; steps: number }> {
@@ -417,6 +436,7 @@ async function handleTool(
   lastObservation: Observation | null,
   markFinished: () => void,
 ): Promise<{ content: string; observation?: Observation }> {
+  const prior = (a.priorScreen ??= { text: '' });
   const findControl = (ref: string): ControlDescriptor => {
     const c = lastObservation?.controls.find((x) => x.ref === ref);
     if (!c) throw new Error(`unknown ref "${ref}". Call observe again — refs are only valid for the most recent observation.`);
@@ -443,6 +463,8 @@ async function handleTool(
     }
 
     case 'click': {
+      const pending = a.recordSteps ? a.recorder.unprovenWriteStep() : undefined;
+      if (pending) return { content: unprovenWriteMessage(pending) };
       const c = findControl(String(input.ref));
       const label = c.name ?? c.visualLabel ?? c.fieldName ?? c.role;
       const decision = a.policy.checkAction({ type: 'click', target: { description: label, framePath: c.framePath, strategies: c.candidateStrategies } }, 'read', label);
@@ -460,15 +482,24 @@ async function handleTool(
       }
       const r = await a.surface.resolveRef(String(input.ref));
       if (!r.ok) return { content: `could not act on ${String(input.ref)}: ${r.failure.reason}` };
+      prior.text = await a.surface.pageText();
       const perf = await a.surface.perform({ type: 'click', target: r.target }, 15_000);
       if (!perf.ok) return { content: `click failed: ${perf.error}` };
       if (a.recordSteps) a.recorder.recordClick(c, String(input.why ?? ''));
       const obs = await a.surface.observe();
-      return { content: `Clicked "${label}".\n\n${renderObservation(obs)}`, observation: obs };
+      // Ask for the proof here, on the screen the click produced, rather than
+      // letting the model discover the requirement by being refused later.
+      const owed = a.recordSteps ? a.recorder.unprovenWriteStep() : undefined;
+      const demand = owed
+        ? `\n\nThat click was recorded as ${owed.risk}. Call checkpoint now, with static wording from this screen, before anything else.`
+        : '';
+      return { content: `Clicked "${label}".${demand}\n\n${renderObservation(obs)}`, observation: obs };
     }
 
     case 'fill':
     case 'select': {
+      const pending = a.recordSteps ? a.recorder.unprovenWriteStep() : undefined;
+      if (pending) return { content: unprovenWriteMessage(pending) };
       const c = findControl(String(input.ref));
       const raw = String(input.value ?? '');
       const resolved = substitutePlaceholder(raw, a.inputValues, a.credentials);
@@ -491,6 +522,8 @@ async function handleTool(
     }
 
     case 'read': {
+      const pending = a.recordSteps ? a.recorder.unprovenWriteStep() : undefined;
+      if (pending) return { content: unprovenWriteMessage(pending) };
       const c = findControl(String(input.ref));
       const field = String(input.field);
       const r = await a.surface.resolveRef(String(input.ref));
@@ -510,12 +543,24 @@ async function handleTool(
       if (bad) return { content: `REJECTED: ${bad}` };
       const check = await a.surface.evaluate({ kind: 'textPresent', value: text, match: 'contains' }, 2000);
       if (!check.held) return { content: `REJECTED: ${JSON.stringify(text)} is not present on the current screen.` };
+      // Wording carried over from the previous screen cannot prove the action
+      // landed: "Open Sub-Account" is the link you clicked AND the title of the
+      // form it opens, so a checkpoint on it would hold even if nothing moved.
+      if (prior.text && prior.text.toLowerCase().includes(text.toLowerCase())) {
+        return {
+          content:
+            `REJECTED: ${JSON.stringify(text)} was already on the screen before this action, so it proves nothing. ` +
+            `Pick wording that appeared only as a RESULT of it — a heading, field label or message unique to this screen.`,
+        };
+      }
       if (a.recordSteps) a.recorder.attachCheckpoint(text, input.frame ? [String(input.frame)] : undefined);
       return { content: `Checkpoint recorded.` };
     }
 
     case 'finish': {
       if (a.finishToolName !== 'finish') return { content: 'This phase expects record_outcome, not finish.' };
+      const pending = a.recordSteps ? a.recorder.unprovenWriteStep() : undefined;
+      if (pending) return { content: unprovenWriteMessage(pending) };
       const text = String(input.provingText);
       const bad = a.recorder.validateProvingText(text);
       if (bad) return { content: `REJECTED: ${bad}` };
@@ -629,6 +674,7 @@ Placeholders you may pass to fill/select: ${placeholderList(inputs, credentials)
 2. Address controls only by ref. Never invent a selector.
 3. To enter an input or a credential, pass the placeholder, not a literal. You will never be shown a credential's value.
 4. After each action that changes the screen, call checkpoint with wording that PROVES you arrived: a screen title, a field label, a fixed message. Never use a value from this run — a checkpoint containing "123456" would only ever hold for this one member.
+   This is not optional after a button that submits, saves, creates or opens something: a recording where a write step has no checkpoint is REJECTED, because replay could otherwise report success having changed nothing.
 5. Use read to bind each declared output to the control that displays it. Prefer the specific cell over a whole table.
 6. When the goal is met, call finish.
 
