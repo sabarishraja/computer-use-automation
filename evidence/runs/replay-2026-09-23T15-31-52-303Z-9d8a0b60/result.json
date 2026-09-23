@@ -1,0 +1,17 @@
+{
+  "runId": "replay-2026-09-23T15-31-52-303Z-9d8a0b60",
+  "capabilityId": "memberlink.open-sub-account",
+  "capabilityVersion": "1.0.0",
+  "startedAt": "2026-09-23T15:31:52.303Z",
+  "durationMs": 21636,
+  "stepsAttempted": 12,
+  "stepsTotal": 12,
+  "recoveries": [],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-23T15-31-52-303Z-9d8a0b60",
+  "status": "success",
+  "outputs": {
+    "reference": "SA-[id:48a6e3ed8a]"
+  }
+}

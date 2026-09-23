@@ -1,0 +1,26 @@
+{
+  "runId": "replay-2026-09-22T22-18-54-300Z-88b7e555",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "startedAt": "2026-09-22T22:18:54.300Z",
+  "durationMs": 27523,
+  "stepsAttempted": 9,
+  "stepsTotal": 9,
+  "recoveries": [
+    {
+      "stepId": "s06-fill",
+      "ruleId": "dismiss-maintenance-notice",
+      "description": "Clear the scheduled-maintenance interstitial that the app can interpose on any screen.",
+      "attempt": 1,
+      "succeeded": true
+    }
+  ],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-22T22-18-54-300Z-88b7e555",
+  "status": "success",
+  "outputs": {
+    "memberName": "[redacted:pii]",
+    "savingsBalance": "[redacted:financial]"
+  }
+}

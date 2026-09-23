@@ -1,0 +1,36 @@
+{
+  "runId": "replay-2026-09-23T15-30-45-651Z-3f6f1b54",
+  "capabilityId": "memberlink.open-sub-account",
+  "capabilityVersion": "1.0.0",
+  "stepId": "s11-click",
+  "stepIntent": "Submit the sub-account request to proceed to confirmation.",
+  "stepIndex": 11,
+  "stepCount": 12,
+  "reason": "unknown_state",
+  "detail": "Step 11/12 \"Submit the sub-account request to proceed to confirmation.\" ran, but the expected state did not appear.\nExpected: page text contains \"Sub-Account Confirmation\"\nObserved: text \"Sub-Account Confirmation\" absent",
+  "askedOf": "Look at the screen. If the application is asking for something the automation cannot supply, do it yourself and release with \"mark step done\". Otherwise release with \"resume\" to retry the step, or abort.",
+  "url": "http://127.0.0.1:4173/t/summit/",
+  "screenshot": "048-escalation-s11-click.png",
+  "sessionEndpoint": "in-process",
+  "ticketId": "esc-8bd78da2",
+  "createdAt": "2026-09-23T15:31:23.822Z",
+  "status": "resolved",
+  "operatorActions": [
+    {
+      "at": "2026-09-23T15:31:28.017Z",
+      "kind": "type",
+      "target": "c5",
+      "value": "[operator-entered]"
+    },
+    {
+      "at": "2026-09-23T15:31:32.090Z",
+      "kind": "click",
+      "target": "c6"
+    }
+  ],
+  "claimedBy": "scripted-supervisor",
+  "claimedAt": "2026-09-23T15:31:23.966Z",
+  "resolvedAt": "2026-09-23T15:31:32.092Z",
+  "disposition": "resume_step_done",
+  "operatorNotes": "Supervisor override authorised for a deposit above the branch limit."
+}

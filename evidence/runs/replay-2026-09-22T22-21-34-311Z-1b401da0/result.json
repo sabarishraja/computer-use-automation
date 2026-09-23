@@ -1,0 +1,48 @@
+{
+  "runId": "replay-2026-09-22T22-21-34-311Z-1b401da0",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "tenantId": "harbor",
+  "startedAt": "2026-09-22T22:21:34.311Z",
+  "durationMs": 14220,
+  "stepsAttempted": 9,
+  "stepsTotal": 9,
+  "recoveries": [],
+  "escalations": [],
+  "drift": [
+    {
+      "stepId": "s05-click",
+      "target": "Member Search",
+      "recordedTier": "semantic",
+      "resolvedTier": "semantic",
+      "strategyIndex": 1
+    },
+    {
+      "stepId": "s06-fill",
+      "target": "Member Number",
+      "recordedTier": "structural",
+      "resolvedTier": "structural",
+      "strategyIndex": 3
+    },
+    {
+      "stepId": "s07-click",
+      "target": "Search",
+      "recordedTier": "semantic",
+      "resolvedTier": "semantic",
+      "strategyIndex": 1
+    },
+    {
+      "stepId": "s08-extract",
+      "target": "Name",
+      "recordedTier": "positional",
+      "resolvedTier": "structural",
+      "strategyIndex": 1
+    }
+  ],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-22T22-21-34-311Z-1b401da0",
+  "status": "success",
+  "outputs": {
+    "memberName": "[redacted:pii]",
+    "savingsBalance": "[redacted:financial]"
+  }
+}

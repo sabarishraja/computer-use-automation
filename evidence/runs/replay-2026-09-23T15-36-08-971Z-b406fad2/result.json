@@ -1,0 +1,26 @@
+{
+  "runId": "replay-2026-09-23T15-36-08-971Z-b406fad2",
+  "capabilityId": "memberlink.open-sub-account",
+  "capabilityVersion": "1.0.0",
+  "startedAt": "2026-09-23T15:36:08.971Z",
+  "durationMs": 51064,
+  "stepsAttempted": 12,
+  "stepsTotal": 12,
+  "recoveries": [],
+  "escalations": [
+    {
+      "ticketId": "esc-cd09d2d0",
+      "reason": "unknown_state",
+      "stepId": "s11-click",
+      "disposition": "resume_step_done",
+      "operatorActions": 2,
+      "waitedMs": 8345
+    }
+  ],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-23T15-36-08-971Z-b406fad2",
+  "status": "success",
+  "outputs": {
+    "reference": "SA-[id:bbc22ad046]"
+  }
+}
