@@ -1,2 +1,0 @@
-{"seq":1,"at":"2026-09-22T22:15:35.531Z","sinceStartMs":1,"runId":"replay-2026-09-22T22-15-35-530Z-54db743a","type":"run.start","kind":"replay","capability":"[redacted:email]","inputs":{"memberId":"[id:82a8a23f6a]"}}
-{"seq":2,"at":"2026-09-22T22:15:35.533Z","sinceStartMs":3,"runId":"replay-2026-09-22T22-15-35-530Z-54db743a","type":"run.end","status":"failure:input_validation","ms":3,"error":"inputs rejected by the capability contract: memberId: must match ^\\d{6}$"}

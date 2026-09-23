@@ -41,7 +41,7 @@ cp .env.example .env         # then set ANTHROPIC_API_KEY for the discovery step
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...        # discovery only — replay never reads this
-CUA_MODEL=claude-opus-5             # optional
+CUA_MODEL=claude-sonnet-5           # optional; what the shipped recordings used
 CUA_SECRET_OPERATOR_ID=OPR001       # fake training credentials for the mock app
 CUA_SECRET_OPERATOR_PASSWORD=training-only
 CUA_SECRET_OVERRIDE_CODE=4417       # what the scripted supervisor types during escalation
@@ -56,7 +56,8 @@ Everything except discovery works with `ANTHROPIC_API_KEY` unset — that is the
 design, and the test suite enforces it:
 
 ```bash
-npm test          # 56 tests, incl. full replay/recovery/escalation against the live app
+npm test          # full suite: replay, recovery, escalation and the shipped artifacts,
+                  # against the live app, with no model anywhere
 ```
 
 ---
@@ -114,7 +115,9 @@ npm run replay -- --capability memberlink.lookup-member-balance --param memberId
 **6. Replay hitting runtime faults.** `--chaos` arms a fault in the target app first.
 
 ```bash
-# recoverable: the run survives, and says so in recoveries[]
+# recoverable. interstitial and expire are cleared by a declared recovery rule and
+# appear in recoveries[]; slow is simply absorbed by the step deadline, so it
+# reports success with recoveries[] empty — the run survived, nothing was repaired
 npm run replay -- --capability memberlink.lookup-member-balance --param memberId=123456 --chaos slow
 npm run replay -- --capability memberlink.lookup-member-balance --param memberId=123456 --chaos interstitial
 npm run replay -- --capability memberlink.lookup-member-balance --param memberId=123456 --chaos expire
@@ -209,7 +212,7 @@ docs/capability.schema.json   generated JSON Schema for the artifact
 | `npm run overlay -- --capability <id> --overlay <file>` | attach a tenant overlay |
 | `npm run operator` | operator console standalone |
 | `npm run schema` | regenerate `docs/capability.schema.json` |
-| `npm test` | 56 tests, no API key required |
+| `npm test` | full suite; no API key required, and a test enforces that |
 | `npm run typecheck` | `tsc --noEmit` |
 
 ### Replay flags
@@ -217,7 +220,9 @@ docs/capability.schema.json   generated JSON Schema for the artifact
 `--param k=v` (repeatable) · `--tenant <id>` · `--chaos slow|interstitial|expire|apperror` ·
 `--operator auto|console|none` · `--headed` · `--allow-draft` · `--base-url <url>`
 
-Exit codes: `0` success · `3` business outcome · `1` failure.
+`--chaos` and `--operator` reject an unrecognised value rather than accepting it silently.
+
+Exit codes: `0` success · `3` business outcome · `1` failure · `2` usage.
 
 ---
 
@@ -225,4 +230,18 @@ Exit codes: `0` success · `3` business outcome · `1` failure.
 
 `evidence/` contains a recorded artifact plus logs from a real discovery run and from several
 replay runs — success, a business outcome, a recovered interstitial, a hard failure, and an
-escalation with human handoff. Every file is redacted at write time.
+escalation with human handoff.
+
+Declared values — inputs, credentials, and any value bound to a declared output — are registered
+with the redactor before the first log line and scrubbed on the way to disk. Replay evidence is
+clean of PII and financial values by construction, and a test asserts it.
+
+Discovery transcripts are the documented exception, and the limit is worth stating plainly: a
+transcript contains the page text the model was shown, and the redactor can only scrub values it
+was told about. A capability that declares a name as an output has that name redacted everywhere;
+`memberlink.open-sub-account` declares only a reference number, so the member name it happened to
+read on the way past survives in that transcript as incidental page text. This is why transcripts
+live outside the artifact, carry only a digest into it, and are treated as regulated data with the
+same retention as the source system. Scrubbing arbitrary unlabelled PII out of page text would
+need a classifier, and a classifier that is 98% right is not a control you can put in front of a
+regulator.

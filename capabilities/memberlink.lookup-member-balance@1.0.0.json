@@ -60,7 +60,7 @@
     },
     {
       "id": "s02-fill",
-      "intent": "Enter operator ID credential.",
+      "intent": "Enter operator ID",
       "action": {
         "type": "fill",
         "target": {
@@ -112,7 +112,7 @@
     },
     {
       "id": "s03-fill",
-      "intent": "Enter operator password credential.",
+      "intent": "Enter operator password",
       "action": {
         "type": "fill",
         "target": {
@@ -164,7 +164,7 @@
     },
     {
       "id": "s04-click",
-      "intent": "Submit sign-on form.",
+      "intent": "Submit sign-on form",
       "action": {
         "type": "click",
         "target": {
@@ -198,7 +198,7 @@
     },
     {
       "id": "s05-click",
-      "intent": "Navigate to Member Search to look up the member by ID.",
+      "intent": "Navigate to Member Search",
       "action": {
         "type": "click",
         "target": {
@@ -229,7 +229,7 @@
     },
     {
       "id": "s06-fill",
-      "intent": "Enter the member number to search for.",
+      "intent": "Enter member number to search",
       "action": {
         "type": "fill",
         "target": {
@@ -283,7 +283,7 @@
     },
     {
       "id": "s07-click",
-      "intent": "Search for the member.",
+      "intent": "Search for the member",
       "action": {
         "type": "click",
         "target": {
@@ -319,7 +319,7 @@
     },
     {
       "id": "s08-extract",
-      "intent": "Extract the member's name as shown on the detail screen.",
+      "intent": "Extract member's name from detail screen",
       "action": {
         "type": "extract",
         "target": {
@@ -362,7 +362,7 @@
     },
     {
       "id": "s09-extract",
-      "intent": "Extract the SHARE SAVINGS current balance.",
+      "intent": "Extract SHARE SAVINGS current balance",
       "action": {
         "type": "extract",
         "target": {
@@ -408,7 +408,10 @@
       "when": {
         "kind": "textPresent",
         "value": "No member record found",
-        "match": "contains"
+        "match": "contains",
+        "framePath": [
+          "mainFrame"
+        ]
       },
       "message": "No member record exists for {{inputs.memberId}}.",
       "partialOutputs": []
@@ -419,10 +422,7 @@
       "when": {
         "kind": "textPresent",
         "value": "is not authorized to view this member record.",
-        "match": "contains",
-        "framePath": [
-          "mainFrame"
-        ]
+        "match": "contains"
       },
       "message": "Access to member {{inputs.memberId}} is restricted for this operator.",
       "partialOutputs": []
@@ -595,12 +595,12 @@
     ]
   },
   "provenance": {
-    "recordedAt": "2026-09-22T22:09:08.893Z",
+    "recordedAt": "2026-09-23T17:10:11.259Z",
     "recordedBy": "llm-discovery",
     "goal": "Sign on as the operator, look up member {{inputs.memberId}}, open their record, and read their name and their SHARE SAVINGS account balance.",
     "model": "claude-sonnet-5",
-    "discoveryRunId": "discovery-2026-09-22T22-07-44-638Z-58b679de",
-    "transcriptDigest": "e4a33457b802579011ae1d2f3bdfd1fb3a9000d8bbc25483fb060851cd20de03",
+    "discoveryRunId": "discovery-2026-09-23T17-08-35-658Z-7d00838a",
+    "transcriptDigest": "e280021a9de64c290da3d1cd245b8ef0d045675895044ab7ac90283b2de1648c",
     "humanEditedSteps": []
   },
   "tenantOverlays": [

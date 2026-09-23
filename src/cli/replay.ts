@@ -55,8 +55,38 @@ async function main(): Promise<void> {
   const chaos = flagStr(args, 'chaos', 'none');
   const operatorMode = flagStr(args, 'operator', 'auto');
 
+  // Unvalidated, a typo was worse than useless: `--chaos expired` printed
+  // "armed runtime fault", armed nothing, and the clean pass that followed read
+  // as "the fault was survived". `--operator bogus` quietly became console mode
+  // and hung the run until the ticket timeout.
+  const CHAOS_MODES = ['none', 'slow', 'interstitial', 'expire', 'apperror'];
+  if (!CHAOS_MODES.includes(chaos)) {
+    console.error(`unknown --chaos "${chaos}". Expected one of: ${CHAOS_MODES.join(', ')}`);
+    process.exit(2);
+  }
+  const OPERATOR_MODES = ['auto', 'console', 'none'];
+  if (!OPERATOR_MODES.includes(operatorMode)) {
+    console.error(`unknown --operator "${operatorMode}". Expected one of: ${OPERATOR_MODES.join(', ')}`);
+    process.exit(2);
+  }
+
   const store = new CapabilityStore(CAPABILITY_DIR);
-  const capability = store.load(ref);
+  let capability;
+  try {
+    capability = store.load(ref);
+  } catch (e) {
+    // A caller shelling out parses stdout. A raw stack trace on stderr with an
+    // empty stdout gives it nothing to parse, so loading failures speak the
+    // same result contract as everything else.
+    console.log(
+      JSON.stringify(
+        { status: 'failure', error: { category: 'configuration', retryable: false, message: (e as Error).message } },
+        null,
+        2,
+      ),
+    );
+    process.exit(1);
+  }
 
   const target = await ensureTargetApp(baseUrl);
   if (chaos !== 'none') {

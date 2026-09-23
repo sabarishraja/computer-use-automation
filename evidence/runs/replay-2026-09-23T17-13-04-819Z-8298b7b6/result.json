@@ -1,0 +1,19 @@
+{
+  "runId": "replay-2026-09-23T17-13-04-819Z-8298b7b6",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "startedAt": "2026-09-23T17:13:04.819Z",
+  "durationMs": 8035,
+  "stepsAttempted": 7,
+  "stepsTotal": 9,
+  "recoveries": [],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-23T17-13-04-819Z-8298b7b6",
+  "status": "business_outcome",
+  "outcome": {
+    "code": "MEMBER_RESTRICTED",
+    "message": "Access to member [id:36b34b64cc] is restricted for this operator."
+  },
+  "outputs": {}
+}

@@ -1,0 +1,19 @@
+{
+  "runId": "replay-2026-09-23T17-12-38-456Z-02be006f",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "startedAt": "2026-09-23T17:12:38.456Z",
+  "durationMs": 24538,
+  "stepsAttempted": 7,
+  "stepsTotal": 9,
+  "recoveries": [],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-23T17-12-38-456Z-02be006f",
+  "status": "business_outcome",
+  "outcome": {
+    "code": "MEMBER_NOT_FOUND",
+    "message": "No member record exists for [id:70e567fe8f]."
+  },
+  "outputs": {}
+}

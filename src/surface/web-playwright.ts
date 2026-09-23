@@ -13,6 +13,7 @@ import type {
 } from './types.js';
 import type { Condition, ControlRole, Locator, LocatorStrategy, TextMatch } from '../artifact/schema.js';
 import { inventoryScript, type RawControl } from './inventory.js';
+import { originPrefixMatches } from '../policy/origins.js';
 
 /**
  * The inventory function is serialised into the page as source. TypeScript
@@ -89,6 +90,19 @@ export class WebSurface implements Surface {
     const args: string[] = [];
     if (opts.remoteDebuggingPort) args.push(`--remote-debugging-port=${opts.remoteDebuggingPort}`);
     s.browser = await chromium.launch({ headless: opts.headless, args });
+    try {
+      await s.setUp(opts);
+    } catch (e) {
+      // Everything after chromium.launch can throw. Without this the browser
+      // process outlives the failed run, because the caller only sees an error.
+      await s.browser.close().catch(() => {});
+      throw e;
+    }
+    return s;
+  }
+
+  private async setUp(opts: WebSurfaceOptions): Promise<void> {
+    const s = this;
     s.context = await s.browser.newContext({ viewport: opts.viewport });
 
     // Network-level allowlist. The policy engine also checks navigations, but
@@ -108,7 +122,6 @@ export class WebSurface implements Surface {
       s.statusLog.push({ status: r.status(), at: Date.now() });
       if (s.statusLog.length > 40) s.statusLog.shift();
     });
-    return s;
   }
 
   /** Exposed to the session controller so a human can drive the same page. */
@@ -122,7 +135,7 @@ export class WebSurface implements Surface {
   isAllowed(url: string): boolean {
     try {
       const u = new URL(url);
-      return this.opts.allowedOrigins.some((o) => (u.origin + u.pathname).startsWith(o) || u.origin === o);
+      return this.opts.allowedOrigins.some((o) => originPrefixMatches(u, o));
     } catch {
       return false;
     }
@@ -348,9 +361,13 @@ export class WebSurface implements Surface {
           return frame.locator(`xpath=//tr[${rowPred}]/td[${s.column + 1}]`);
         }
         // Column addressed by header text: find its index, then take that cell.
-        return frame.locator(
-          `xpath=//tr[${rowPred}]/td[count(ancestor::table[1]//tr[1]/th[normalize-space(.)=${xpathLiteral(s.column)}]/preceding-sibling::th)+1]`,
-        );
+        // The second predicate is load-bearing. `count()` of a header that does
+        // not exist is 0, so without it the expression degrades to `td[1]` and
+        // returns the FIRST column — one match, no error, wrong number. A
+        // renamed column has to fail the strategy so the ranked list moves on,
+        // not hand back a confidently wrong balance.
+        const header = `ancestor::table[1]//tr[1]/th[normalize-space(.)=${xpathLiteral(s.column)}]`;
+        return frame.locator(`xpath=//tr[${rowPred}]/td[count(${header}/preceding-sibling::th)+1][${header}]`);
       }
       case 'css':
         return frame.locator(s.selector);
@@ -432,18 +449,6 @@ export class WebSurface implements Surface {
       if (Date.now() >= deadline) return { held: false, detail: last };
       await sleep(150);
     }
-  }
-
-  async pageText(): Promise<string> {
-    const parts: string[] = [];
-    for (const f of this.page.frames()) {
-      const t = await f
-        .locator('body')
-        .innerText({ timeout: 1500 })
-        .catch(() => '');
-      if (t) parts.push(normalise(t));
-    }
-    return parts.join('\n');
   }
 
   private async evaluateOnce(c: Condition): Promise<{ held: boolean; detail: string }> {

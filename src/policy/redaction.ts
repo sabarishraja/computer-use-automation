@@ -31,7 +31,11 @@ export type RedactionClass = Sensitivity;
 const PATTERNS: Array<{ label: string; re: RegExp }> = [
   { label: 'ssn', re: /\b\d{3}-\d{2}-\d{4}\b/g },
   { label: 'card', re: /\b(?:\d[ -]*?){13,19}\b/g },
-  { label: 'email', re: /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g },
+  // The domain half must contain a letter. Without that a capability id —
+  // "memberlink.lookup-member-balance@1.0.0" — matches, and every run log
+  // reads "capability":"[redacted:email]": the one field saying which
+  // capability a log belongs to, destroyed by its own redactor.
+  { label: 'email', re: /\b[\w.+-]+@[\w-]*[A-Za-z][\w-]*\.[\w.-]*[A-Za-z][\w.-]*\b/g },
   { label: 'bearer', re: /\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi },
   { label: 'apikey', re: /\b(?:sk|pk|api|key|token|secret)[-_][A-Za-z0-9._-]{12,}\b/gi },
   { label: 'routing', re: /\baba[:\s#]*\d{9}\b/gi },

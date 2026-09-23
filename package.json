@@ -16,7 +16,6 @@
     "schema": "tsx src/cli/emit-schema.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "demo:all": "tsx src/cli/demo.ts",
     "overlay": "tsx src/cli/overlay.ts"
   },
   "dependencies": {

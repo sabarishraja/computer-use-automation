@@ -1,0 +1,26 @@
+{
+  "runId": "replay-2026-09-23T17-14-10-822Z-8d32bed0",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "startedAt": "2026-09-23T17:14:10.822Z",
+  "durationMs": 36732,
+  "stepsAttempted": 9,
+  "stepsTotal": 9,
+  "recoveries": [
+    {
+      "stepId": "s04-click",
+      "ruleId": "re-authenticate",
+      "description": "Sign on again after the application expires the session mid-run.",
+      "attempt": 1,
+      "succeeded": true
+    }
+  ],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-23T17-14-10-822Z-8d32bed0",
+  "status": "success",
+  "outputs": {
+    "memberName": "[redacted:pii]",
+    "savingsBalance": "[redacted:financial]"
+  }
+}

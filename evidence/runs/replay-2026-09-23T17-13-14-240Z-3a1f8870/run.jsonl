@@ -1,0 +1,2 @@
+{"seq":1,"at":"2026-09-23T17:13:14.241Z","sinceStartMs":1,"runId":"replay-2026-09-23T17-13-14-240Z-3a1f8870","type":"run.start","kind":"replay","capability":"memberlink.lookup-member-balance@1.0.0","inputs":{"memberId":"[id:68dd6b973c]"}}
+{"seq":2,"at":"2026-09-23T17:13:14.242Z","sinceStartMs":2,"runId":"replay-2026-09-23T17-13-14-240Z-3a1f8870","type":"run.end","status":"failure:input_validation","ms":2,"error":"inputs rejected by the capability contract: memberId: must match ^\\d{6}$"}

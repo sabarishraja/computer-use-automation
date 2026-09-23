@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { relative } from 'node:path';
 import {
   renderTemplate,
+  TemplateResolutionError,
   type Action,
   type Capability,
   type Condition,
@@ -137,15 +138,18 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     inputs: opts.inputs,
   });
 
-  if (cap.state === 'draft' && !opts.allowDraft) {
+  // `requiresApprovalState` is the artifact's own declaration of which states
+  // it may run in. It used to be quoted in the error message below while the
+  // engine hardcoded the rule — a field that read as enforced and was not.
+  if (!cap.policy.requiresApprovalState.includes(cap.state) && !(cap.state === 'draft' && opts.allowDraft)) {
     return failNow('policy_denied', {
-      message: `capability ${cap.id}@${cap.version} is in state "draft"; unattended replay requires review and approval`,
+      message:
+        cap.state === 'draft'
+          ? `capability ${cap.id}@${cap.version} is in state "draft"; unattended replay requires review and approval`
+          : `capability ${cap.id}@${cap.version} is in state "${cap.state}", which it does not permit for replay`,
       expected: `state in ${JSON.stringify(cap.policy.requiresApprovalState)}`,
-      observed: 'draft',
+      observed: cap.state,
     });
-  }
-  if (cap.state === 'deprecated') {
-    return failNow('policy_denied', { message: `capability ${cap.id}@${cap.version} is deprecated`, observed: 'deprecated' });
   }
 
   const parsedInputs = inputSchema(cap.inputs).safeParse(opts.inputs);
@@ -711,6 +715,13 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     logger.writeResult({ ...result, outputs: forEvidence });
     return result;
   } catch (e) {
+    // A missing credential or env value is a deployment problem, not a defect
+    // in this engine, and a caller must be able to tell those apart.
+    if (e instanceof TemplateResolutionError) {
+      return await fail('configuration', {
+        message: `${e.message}. Set it in the environment (see .env.example) before replaying this capability.`,
+      });
+    }
     return await fail('internal', { message: `unhandled error in the replay engine: ${(e as Error).message}` });
   } finally {
     await surface.close();

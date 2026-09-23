@@ -10,6 +10,7 @@ import { EscalationBroker } from '../src/escalation/broker.js';
 import { OperatorConsole } from '../src/escalation/operator-console.js';
 import { runAutoOperator } from '../src/escalation/auto-operator.js';
 import { Redactor } from '../src/policy/redaction.js';
+import { CapabilityStore } from '../src/artifact/store.js';
 
 /**
  * End-to-end coverage of the production execution path, against the real
@@ -187,18 +188,70 @@ describe('replay — cross-tenant reuse', () => {
         },
       ],
     };
-    // The first step is pinned to /t/summit in the recording; the overlay
-    // re-points the entry, so rewrite that one navigate for the tenant.
     const resolved = applyOverlay(withOverlay, withOverlay.tenantOverlays[0]!);
-    (resolved.steps[0]!.action as { url: string }).url = '{{env.baseUrl}}/t/harbor/';
+
+    // The overlay alone must re-point the run. This used to be patched by hand
+    // here — which meant the test passed while `--tenant harbor` drove Summit
+    // and reported another institution's balance as success.
+    expect((resolved.steps[0]!.action as { url: string }).url).toBe('{{env.baseUrl}}/t/harbor/');
+    expect(resolved.policy.allowedOrigins).toEqual([`${BASE}/t/harbor`]);
 
     const r = await replay({ capability: resolved, inputs: { memberId: '123456' }, env: env(), evidenceRoot });
     expect(r.status).toBe('success');
     if (r.status !== 'success') return;
     expect(r.outputs.savingsBalance).toBe(4820.15);
-    // Harbor interposes a disclosure after sign-on; the app-level rule clears it.
+    // Harbor interposes a disclosure after sign-on; the app-level rule clears
+    // it. This assertion is the tenant proof: on Summit it cannot fire.
     expect(r.recoveries.map((x) => x.ruleId)).toContain('acknowledge-disclosure');
   }, 90_000);
+});
+
+describe('the artifacts that actually ship', () => {
+  // Every other integration test drives `lookupFixture`, a hand-written
+  // capability. That proves the engine and leaves the recorder→artifact→replay
+  // link — the thing a reviewer runs — unguarded.
+  const store = new CapabilityStore(join(__dirname, '..', 'capabilities'));
+
+  function shipped(id: string) {
+    const cap = store.load(id);
+    cap.policy = { ...cap.policy, allowedOrigins: [`${BASE}/t/summit`, `${BASE}/t/harbor`] };
+    return cap;
+  }
+
+  it('replays the recorded balance lookup', async () => {
+    const r = await replay({
+      capability: shipped('memberlink.lookup-member-balance'),
+      inputs: { memberId: '123456' },
+      env: env(),
+      evidenceRoot,
+    });
+    expect(r.status).toBe('success');
+    if (r.status !== 'success') return;
+    expect(r.outputs.memberName).toBe('DELACROIX, RENE J');
+    expect(r.outputs.savingsBalance).toBe(4820.15);
+  }, 90_000);
+
+  it('reaches the confirmation screen on the recorded write capability', async () => {
+    const r = await replay({
+      capability: shipped('memberlink.open-sub-account'),
+      inputs: { memberId: '123456', accountType: 'VACATION CLUB', openingDeposit: 250 },
+      env: env(),
+      evidenceRoot,
+    });
+    expect(r.status).toBe('success');
+    if (r.status !== 'success') return;
+    expect(r.outputs.reference).toBe('SA-123456');
+  }, 90_000);
+
+  it('every shipped artifact is approved and carries proof on each write step', () => {
+    for (const id of ['memberlink.lookup-member-balance', 'memberlink.open-sub-account']) {
+      const cap = store.load(id);
+      expect(cap.state).toBe('approved');
+      for (const step of cap.steps) {
+        if (step.risk !== 'read') expect(step.checkpoint, `${cap.id} ${step.id}`).toBeTruthy();
+      }
+    }
+  });
 });
 
 describe('escalation — control transfer over the real operator API', () => {

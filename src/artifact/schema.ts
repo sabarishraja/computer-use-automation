@@ -648,6 +648,18 @@ export function referencedNames(template: string): Array<{ scope: 'inputs' | 'ou
 }
 
 /** Substitutes {{inputs.x}} / {{outputs.y}} / {{env.z}} into a template string. */
+/**
+ * A template referenced something the deployment never supplied. Typed so the
+ * engine can report it as `configuration` rather than as an internal defect:
+ * "you did not set CUA_SECRET_OPERATOR_ID" is not "our automation is broken".
+ */
+export class TemplateResolutionError extends Error {
+  constructor(readonly reference: string) {
+    super(`template references ${reference}, which is not set`);
+    this.name = 'TemplateResolutionError';
+  }
+}
+
 export function renderTemplate(
   template: string,
   ctx: { inputs?: Record<string, unknown>; outputs?: Record<string, unknown>; env?: Record<string, string> },
@@ -655,7 +667,7 @@ export function renderTemplate(
   return template.replace(TEMPLATE_RE, (_all, scope: string, name: string) => {
     const bag = (ctx as Record<string, Record<string, unknown> | undefined>)[scope];
     const v = bag?.[name];
-    if (v === undefined || v === null) throw new Error(`template references ${scope}.${name}, which is not set`);
+    if (v === undefined || v === null) throw new TemplateResolutionError(`${scope}.${name}`);
     return String(v);
   });
 }

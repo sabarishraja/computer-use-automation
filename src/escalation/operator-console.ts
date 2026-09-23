@@ -1,6 +1,9 @@
 import express from 'express';
 import type { Server } from 'node:http';
-import type { EscalationBroker } from './broker.js';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { EscalationBroker } from './broker.js';
+import { Redactor } from '../policy/redaction.js';
 import type { EscalationDisposition } from './types.js';
 
 /**
@@ -50,8 +53,8 @@ export class OperatorConsole {
         .list()
         .map(
           (t) =>
-            `<tr><td><a href="/ticket/${t.ticketId}">${t.ticketId}</a></td><td>${t.reason}</td>` +
-            `<td>${t.capabilityId ?? t.goal ?? ''}</td><td>${t.stepIntent ?? ''}</td><td>${t.status}</td></tr>`,
+            `<tr><td><a href="/ticket/${encodeURIComponent(t.ticketId)}">${esc(t.ticketId)}</a></td><td>${esc(t.reason)}</td>` +
+            `<td>${esc(t.capabilityId ?? t.goal ?? '')}</td><td>${esc(t.stepIntent ?? '')}</td><td>${esc(t.status)}</td></tr>`,
         )
         .join('');
       res.type('html').send(
@@ -190,7 +193,9 @@ export class OperatorConsole {
     });
 
     await new Promise<void>((resolve) => {
-      this.server = app.listen(this.port, () => resolve());
+      // Loopback only: this console can take over a live session and has no
+      // authentication, so it must not be reachable from the network.
+      this.server = app.listen(this.port, '127.0.0.1', () => resolve());
     });
   }
 
@@ -201,6 +206,16 @@ export class OperatorConsole {
 }
 
 /* ------------------------------ views ---------------------------------- */
+
+/**
+ * Everything interpolated into this console is untrusted: ticket `detail`
+ * embeds application page text, and `stepIntent` comes from an artifact a
+ * human may have edited. This page can drive a live banking session while the
+ * operator holds control, so script running here is not cosmetic.
+ */
+function esc(v: unknown): string {
+  return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+}
 
 function page(title: string, body: string): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title} · Operator Console</title><style>
@@ -260,12 +275,12 @@ async function j(url, opts) { const r = await fetch(url, opts); const b = await 
 async function refreshCtx(){
   const t = await j('/api/ticket/'+T);
   document.getElementById('ctx').innerHTML =
-    '<b>'+t.reason+'</b> &middot; status <code>'+t.status+'</code><br>'+
-    'Capability: <code>'+(t.capabilityId||'-')+'@'+(t.capabilityVersion||'-')+'</code> tenant <code>'+(t.tenantId||'-')+'</code><br>'+
-    'Step '+(t.stepIndex??'-')+'/'+(t.stepCount??'-')+': <b>'+(t.stepIntent||'-')+'</b><br>'+
-    '<div style="margin-top:6px">'+t.detail+'</div>'+
-    '<div style="margin-top:6px"><b>Asked of you:</b> '+t.askedOf+'</div>'+
-    '<div class="muted" style="margin-top:6px">Attach directly: <code>'+(t.sessionEndpoint||'n/a')+'</code></div>';
+    '<b>'+escapeHtml(t.reason)+'</b> &middot; status <code>'+escapeHtml(t.status)+'</code><br>'+
+    'Capability: <code>'+escapeHtml(t.capabilityId||'-')+'@'+escapeHtml(t.capabilityVersion||'-')+'</code> tenant <code>'+escapeHtml(t.tenantId||'-')+'</code><br>'+
+    'Step '+escapeHtml(t.stepIndex??'-')+'/'+escapeHtml(t.stepCount??'-')+': <b>'+escapeHtml(t.stepIntent||'-')+'</b><br>'+
+    '<div style="margin-top:6px">'+escapeHtml(t.detail)+'</div>'+
+    '<div style="margin-top:6px"><b>Asked of you:</b> '+escapeHtml(t.askedOf)+'</div>'+
+    '<div class="muted" style="margin-top:6px">Attach directly: <code>'+escapeHtml(t.sessionEndpoint||'n/a')+'</code></div>';
   return t;
 }
 function refreshShot(){ document.getElementById('shot').src = '/api/ticket/'+T+'/screen.png?ts='+Date.now(); }
@@ -307,4 +322,17 @@ setInterval(refreshShot, 1500);
 setInterval(refreshCtx, 3000);
 </script>`,
   );
+}
+
+/**
+ * `npm run operator` used to load this module and exit silently, so the
+ * documented standalone console was a no-op that still reported success.
+ */
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const port = Number(process.env.OPERATOR_CONSOLE_PORT ?? 4180);
+  const broker = new EscalationBroker(resolve(process.cwd(), 'evidence'), new Redactor('operator'));
+  const consoleSrv = new OperatorConsole(broker, port);
+  await consoleSrv.start();
+  console.log(`[operator] console listening on ${consoleSrv.baseUrl}`);
+  console.log('[operator] tickets raised by a replay run in this evidence directory will appear here.');
 }

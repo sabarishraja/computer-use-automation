@@ -1,0 +1,27 @@
+{
+  "runId": "replay-2026-09-23T17-15-20-747Z-d2930f67",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "tenantId": "harbor",
+  "startedAt": "2026-09-23T17:15:20.747Z",
+  "durationMs": 35266,
+  "stepsAttempted": 9,
+  "stepsTotal": 9,
+  "recoveries": [
+    {
+      "stepId": "s04-click",
+      "ruleId": "acknowledge-disclosure",
+      "description": "Acknowledge the monitoring disclosure some institutions interpose after sign-on.",
+      "attempt": 1,
+      "succeeded": true
+    }
+  ],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-23T17-15-20-747Z-d2930f67",
+  "status": "success",
+  "outputs": {
+    "memberName": "[redacted:pii]",
+    "savingsBalance": "[redacted:financial]"
+  }
+}

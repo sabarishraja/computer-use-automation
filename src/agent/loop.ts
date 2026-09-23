@@ -3,7 +3,7 @@ import { relative } from 'node:path';
 import type { CapabilitySpec } from './spec.js';
 import { InvalidRecordingError, Recorder, digest } from './recorder.js';
 import { WebSurface } from '../surface/web-playwright.js';
-import type { ControlDescriptor, Observation } from '../surface/types.js';
+import type { ControlDescriptor, FrameObservation, Observation } from '../surface/types.js';
 import { PolicyEngine } from '../policy/guardrails.js';
 import { Redactor } from '../policy/redaction.js';
 import { RunLogger } from '../evidence/run-log.js';
@@ -106,6 +106,7 @@ export async function discover(opts: DiscoveryOptions): Promise<DiscoveryResult>
       transcript,
       credentials,
       inputValues,
+      outputs: spec.outputs,
       maxSteps: spec.maxSteps,
       systemPrompt: happyPathSystemPrompt(spec, inputValues, credentials),
       firstUserMessage: `Goal: ${spec.goal}\n\nEntry point: ${opts.baseUrl}${entryPath(spec.entry)}\n\nBegin by calling observe.`,
@@ -148,7 +149,13 @@ export async function discover(opts: DiscoveryOptions): Promise<DiscoveryResult>
     /* --------------------- phase 2: outcome discovery --------------------- */
     for (const outcome of spec.outcomes) {
       const probe: Record<string, string> = {};
-      for (const [k, v] of Object.entries(outcome.probeInputs)) probe[k] = String(v);
+      for (const [k, v] of Object.entries(outcome.probeInputs)) {
+        probe[k] = String(v);
+        // Probe values reach the transcript and the run log exactly as the
+        // happy path's inputs do, so they are registered exactly as those are.
+        const declaredInput = spec.inputs.find((i) => i.name === k);
+        if (declaredInput) redactor.register(probe[k], declaredInput.sensitivity);
+      }
 
       await surface.perform({ type: 'navigate', url: opts.baseUrl + entryPath(spec.entry) }, 20_000);
       const r = await runPhase({
@@ -162,6 +169,7 @@ export async function discover(opts: DiscoveryOptions): Promise<DiscoveryResult>
         transcript,
         credentials,
         inputValues: probe,
+        outputs: spec.outputs,
         maxSteps: 12,
         systemPrompt: outcomeSystemPrompt(spec, outcome.code, outcome.description, probe, credentials),
         firstUserMessage:
@@ -195,6 +203,18 @@ export async function discover(opts: DiscoveryOptions): Promise<DiscoveryResult>
 }
 
 /**
+ * Was this wording readable before the action? Scoped to one frame when the
+ * checkpoint names one; across every frame when it does not, since an unscoped
+ * checkpoint holds if the text appears anywhere.
+ */
+export function wasAlreadyPresent(frames: FrameObservation[] | null, text: string, frame: string | undefined): boolean {
+  if (!frames) return false;
+  const scoped = frame ? frames.filter((f) => f.framePath.includes(frame)) : frames;
+  const needle = text.toLowerCase();
+  return scoped.some((f) => f.text.toLowerCase().includes(needle));
+}
+
+/**
  * A write step must carry proof that it landed. Refusing the model's next tool
  * call, while the screen that would prove it is still open, is the only point
  * where the gap is cheap to close.
@@ -222,6 +242,8 @@ type PhaseArgs = {
   transcript: unknown[];
   credentials: Record<string, string>;
   inputValues: Record<string, string>;
+  /** Declared outputs, so an extracted value is redacted by its own class. */
+  outputs: CapabilitySpec['outputs'];
   maxSteps: number;
   systemPrompt: string;
   firstUserMessage: string;
@@ -229,10 +251,12 @@ type PhaseArgs = {
   finishToolName: 'finish' | 'record_outcome';
   outcomeCode?: string;
   /**
-   * Text on screen immediately before the last recorded action. A checkpoint
-   * is only proof if its wording was not already there.
+   * The screen as it was immediately before the last recorded action, per
+   * frame. A checkpoint is only proof if its wording was not already there —
+   * and "there" has to mean the frame the checkpoint will be scoped to, since
+   * a frameset's nav frame carries the same words on every screen.
    */
-  priorScreen?: { text: string };
+  priorScreen?: { frames: FrameObservation[] | null };
 };
 
 async function runPhase(a: PhaseArgs): Promise<{ ok: true; steps: number } | { ok: false; reason: string; steps: number }> {
@@ -436,7 +460,12 @@ async function handleTool(
   lastObservation: Observation | null,
   markFinished: () => void,
 ): Promise<{ content: string; observation?: Observation }> {
-  const prior = (a.priorScreen ??= { text: '' });
+  const prior = (a.priorScreen ??= { frames: null });
+  // Captured before ANY recorded action, not just clicks: a checkpoint after a
+  // navigate or a fill needs the same proof that a checkpoint after a click does.
+  const captureprior = (): void => {
+    prior.frames = lastObservation ? lastObservation.frames : null;
+  };
   const findControl = (ref: string): ControlDescriptor => {
     const c = lastObservation?.controls.find((x) => x.ref === ref);
     if (!c) throw new Error(`unknown ref "${ref}". Call observe again — refs are only valid for the most recent observation.`);
@@ -451,10 +480,13 @@ async function handleTool(
     }
 
     case 'navigate': {
+      const pendingNav = a.recordSteps ? a.recorder.unprovenWriteStep() : undefined;
+      if (pendingNav) return { content: unprovenWriteMessage(pendingNav) };
       const url = String(input.url);
       const decision = a.policy.checkUrl(url);
       a.logger.log({ type: 'policy.decision', effect: decision.effect, code: 'code' in decision ? decision.code : undefined, reason: 'reason' in decision ? decision.reason : undefined });
       if (decision.effect !== 'allow') return { content: `REFUSED by policy: ${'reason' in decision ? decision.reason : 'not allowed'}` };
+      captureprior();
       const r = await a.surface.perform({ type: 'navigate', url }, 20_000);
       if (!r.ok) return { content: `navigate failed: ${r.error}` };
       if (a.recordSteps) a.recorder.recordNavigate(url);
@@ -482,7 +514,7 @@ async function handleTool(
       }
       const r = await a.surface.resolveRef(String(input.ref));
       if (!r.ok) return { content: `could not act on ${String(input.ref)}: ${r.failure.reason}` };
-      prior.text = await a.surface.pageText();
+      captureprior();
       const perf = await a.surface.perform({ type: 'click', target: r.target }, 15_000);
       if (!perf.ok) return { content: `click failed: ${perf.error}` };
       if (a.recordSteps) a.recorder.recordClick(c, String(input.why ?? ''));
@@ -508,6 +540,7 @@ async function handleTool(
       }
       const r = await a.surface.resolveRef(String(input.ref));
       if (!r.ok) return { content: `could not act on ${String(input.ref)}: ${r.failure.reason}` };
+      captureprior();
       const perf = await a.surface.perform(
         name === 'fill' ? { type: 'fill', target: r.target, value: resolved } : { type: 'select', target: r.target, value: resolved },
         10_000,
@@ -531,7 +564,15 @@ async function handleTool(
       const perf = await a.surface.perform({ type: 'readText', target: r.target }, 10_000);
       if (!perf.ok) return { content: `read failed: ${perf.error}` };
       if (a.recordSteps) a.recorder.recordExtract(c, field, String(input.why ?? ''));
-      a.logger.log({ type: 'extract', stepId: a.recorder.lastStepId() ?? 'n/a', field, sensitivity: 'unknown', value: perf.text ?? '' });
+      // Register before logging. Discovery used to log an extracted value as
+      // `sensitivity: 'unknown'`, which the redactor had never been told about,
+      // so a member's name went to disk in plaintext while the write-up claimed
+      // every file was redacted at write time. The declared output says what
+      // this value is; use it.
+      const declared = a.outputs.find((o) => o.name === field);
+      const sensitivity = declared?.sensitivity ?? 'unknown';
+      if (declared && perf.text) a.redactor.register(perf.text, declared.sensitivity);
+      a.logger.log({ type: 'extract', stepId: a.recorder.lastStepId() ?? 'n/a', field, sensitivity, value: perf.text ?? '' });
       // The value is echoed so the model can confirm it read the right cell.
       // It is redacted on its way to the evidence log, not here.
       return { content: `Read ${field} = ${JSON.stringify(perf.text ?? '')}` };
@@ -539,21 +580,27 @@ async function handleTool(
 
     case 'checkpoint': {
       const text = String(input.provingText);
-      const bad = a.recorder.validateProvingText(text);
+      const bad = a.recorder.validateProvingText(text, a.inputValues);
       if (bad) return { content: `REJECTED: ${bad}` };
       const check = await a.surface.evaluate({ kind: 'textPresent', value: text, match: 'contains' }, 2000);
       if (!check.held) return { content: `REJECTED: ${JSON.stringify(text)} is not present on the current screen.` };
       // Wording carried over from the previous screen cannot prove the action
       // landed: "Open Sub-Account" is the link you clicked AND the title of the
       // form it opens, so a checkpoint on it would hold even if nothing moved.
-      if (prior.text && prior.text.toLowerCase().includes(text.toLowerCase())) {
+      // Scoped to the frame the checkpoint will be scoped to — otherwise a
+      // frameset's permanent nav links make half the sensible wording
+      // unusable, since it is "already on screen" on every screen.
+      const frameArg = input.frame ? String(input.frame) : undefined;
+      if (wasAlreadyPresent(prior.frames, text, frameArg)) {
         return {
           content:
-            `REJECTED: ${JSON.stringify(text)} was already on the screen before this action, so it proves nothing. ` +
+            `REJECTED: ${JSON.stringify(text)} was already on ${frameArg ? `frame "${frameArg}"` : 'the screen'} before this action, so it proves nothing. ` +
             `Pick wording that appeared only as a RESULT of it — a heading, field label or message unique to this screen.`,
         };
       }
       if (a.recordSteps) a.recorder.attachCheckpoint(text, input.frame ? [String(input.frame)] : undefined);
+      // Spent: a second checkpoint must not be judged against the same screen.
+      prior.frames = null;
       return { content: `Checkpoint recorded.` };
     }
 
@@ -562,7 +609,7 @@ async function handleTool(
       const pending = a.recordSteps ? a.recorder.unprovenWriteStep() : undefined;
       if (pending) return { content: unprovenWriteMessage(pending) };
       const text = String(input.provingText);
-      const bad = a.recorder.validateProvingText(text);
+      const bad = a.recorder.validateProvingText(text, a.inputValues);
       if (bad) return { content: `REJECTED: ${bad}` };
       const check = await a.surface.evaluate({ kind: 'textPresent', value: text, match: 'contains' }, 2000);
       if (!check.held) return { content: `REJECTED: ${JSON.stringify(text)} is not present on the current screen.` };
@@ -574,7 +621,7 @@ async function handleTool(
     case 'record_outcome': {
       if (a.finishToolName !== 'record_outcome' || !a.outcomeCode) return { content: 'This phase expects finish, not record_outcome.' };
       const text = String(input.provingText);
-      const bad = a.recorder.validateProvingText(text);
+      const bad = a.recorder.validateProvingText(text, a.inputValues);
       if (bad) return { content: `REJECTED: ${bad}` };
       const check = await a.surface.evaluate({ kind: 'textPresent', value: text, match: 'contains' }, 2000);
       if (!check.held) return { content: `REJECTED: ${JSON.stringify(text)} is not present on the current screen.` };

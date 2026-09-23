@@ -64,6 +64,11 @@ export type FailureCategory =
   | 'escalation_timeout'
   | 'operator_aborted'
 
+  /** The deployment is missing something the capability declares it needs —
+   * a credential, an env value. Our fault, but not a code defect, and the fix
+   * is a config change rather than a bug report. */
+  | 'configuration'
+
   /** A defect in this system. Distinguished so it is never mistaken for drift. */
   | 'internal';
 
@@ -86,6 +91,7 @@ export const RETRYABLE: Record<FailureCategory, boolean> = {
   recovery_exhausted: true,
   escalation_timeout: true,
   operator_aborted: false,
+  configuration: false,
   internal: false,
 };
 

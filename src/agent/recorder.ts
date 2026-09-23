@@ -63,9 +63,11 @@ export class Recorder {
    * the whole run.
    */
   unprovenWriteStep(): { id: string; risk: RiskClass; intent: string } | undefined {
-    const last = this.steps.at(-1);
-    if (!last || last.risk === 'read' || last.checkpoint) return undefined;
-    return { id: last.id, risk: last.risk, intent: last.intent };
+    // Every step, not just the last one. Inspecting only `steps.at(-1)` meant a
+    // single step recorded after an unproven write hid it until save time —
+    // the exact discard this gate exists to prevent.
+    const step = this.steps.find((x) => x.risk !== 'read' && !x.checkpoint);
+    return step ? { id: step.id, risk: step.risk, intent: step.intent } : undefined;
   }
 
   recordNavigate(url: string): Step {
@@ -146,11 +148,15 @@ export class Recorder {
    * the prompt is persuasive — is what keeps a recorded capability from
    * asserting "the page says 123456" forever after.
    */
-  validateProvingText(text: string): string | null {
+  validateProvingText(text: string, activeValues: Record<string, string> = {}): string | null {
     const t = text.trim();
     if (t.length < 4) return 'proving text must be at least 4 characters';
     if (t.length > 120) return 'proving text must be under 120 characters';
-    for (const [name, value] of Object.entries(this.inputValues)) {
+    // `activeValues` carries what the CURRENT phase is driving with. The
+    // outcome-probe phases run with probe inputs the recorder was never
+    // constructed with, so without this a detector could be recorded as
+    // "No member record found for 000000." and then never fire for anyone else.
+    for (const [name, value] of Object.entries({ ...this.inputValues, ...activeValues })) {
       if (String(value).length >= 3 && t.includes(String(value))) {
         return `proving text must not contain the value of input "${name}" — it would only hold for this one run. Use the surrounding static wording instead.`;
       }

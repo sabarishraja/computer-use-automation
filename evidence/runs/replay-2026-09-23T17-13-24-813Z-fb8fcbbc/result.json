@@ -1,0 +1,18 @@
+{
+  "runId": "replay-2026-09-23T17-13-24-813Z-fb8fcbbc",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "startedAt": "2026-09-23T17:13:24.812Z",
+  "durationMs": 15774,
+  "stepsAttempted": 9,
+  "stepsTotal": 9,
+  "recoveries": [],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-23T17-13-24-813Z-fb8fcbbc",
+  "status": "success",
+  "outputs": {
+    "memberName": "[redacted:pii]",
+    "savingsBalance": "[redacted:financial]"
+  }
+}

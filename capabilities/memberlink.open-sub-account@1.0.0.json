@@ -74,7 +74,7 @@
     },
     {
       "id": "s02-fill",
-      "intent": "Enter operator ID for sign on",
+      "intent": "Enter operator ID for sign-on.",
       "action": {
         "type": "fill",
         "target": {
@@ -126,7 +126,7 @@
     },
     {
       "id": "s03-fill",
-      "intent": "Enter operator password for sign on",
+      "intent": "Enter operator password for sign-on.",
       "action": {
         "type": "fill",
         "target": {
@@ -178,7 +178,7 @@
     },
     {
       "id": "s04-click",
-      "intent": "Submit sign on form",
+      "intent": "Submit sign-on credentials.",
       "action": {
         "type": "click",
         "target": {
@@ -212,7 +212,7 @@
     },
     {
       "id": "s05-click",
-      "intent": "Navigate to Member Search to look up the member",
+      "intent": "Navigate to Member Search to look up the member.",
       "action": {
         "type": "click",
         "target": {
@@ -243,7 +243,7 @@
     },
     {
       "id": "s06-fill",
-      "intent": "Enter member number to search",
+      "intent": "Enter the member number to search for.",
       "action": {
         "type": "fill",
         "target": {
@@ -297,7 +297,7 @@
     },
     {
       "id": "s07-click",
-      "intent": "Search for the member",
+      "intent": "Search for the member.",
       "action": {
         "type": "click",
         "target": {
@@ -333,7 +333,7 @@
     },
     {
       "id": "s08-click",
-      "intent": "Navigate to Open Sub-Account form",
+      "intent": "Start opening a new sub-account for this member.",
       "action": {
         "type": "click",
         "target": {
@@ -369,7 +369,7 @@
     },
     {
       "id": "s09-select",
-      "intent": "Select the requested account type",
+      "intent": "Select the requested account type for the sub-account.",
       "action": {
         "type": "select",
         "target": {
@@ -423,7 +423,7 @@
     },
     {
       "id": "s10-fill",
-      "intent": "Enter the opening deposit amount",
+      "intent": "Enter the opening deposit amount.",
       "action": {
         "type": "fill",
         "target": {
@@ -477,7 +477,7 @@
     },
     {
       "id": "s11-click",
-      "intent": "Submit the sub-account opening form",
+      "intent": "Submit the sub-account opening request to proceed to confirmation.",
       "action": {
         "type": "click",
         "target": {
@@ -504,7 +504,7 @@
       "risk": "write_reversible",
       "checkpoint": {
         "kind": "textPresent",
-        "value": "Sub-Account Confirmation",
+        "value": "Review and confirm. No account has been opened yet.",
         "match": "contains"
       },
       "recovery": [],
@@ -513,7 +513,7 @@
     },
     {
       "id": "s12-extract",
-      "intent": "Extract the reference number from the confirmation screen",
+      "intent": "Extract the reference number shown on the confirmation screen.",
       "action": {
         "type": "extract",
         "target": {
@@ -683,7 +683,7 @@
   ],
   "successCondition": {
     "kind": "textPresent",
-    "value": "Sub-Account Confirmation",
+    "value": "Review and confirm. No account has been opened yet.",
     "match": "contains"
   },
   "policy": {
@@ -698,12 +698,12 @@
     ]
   },
   "provenance": {
-    "recordedAt": "2026-09-23T15:35:44.159Z",
+    "recordedAt": "2026-09-23T17:12:06.836Z",
     "recordedBy": "llm-discovery",
     "goal": "Sign on as the operator, look up member {{inputs.memberId}}, start a new sub-account of the requested type with the requested opening deposit, and reach the confirmation screen. Do not post it.",
     "model": "claude-sonnet-5",
-    "discoveryRunId": "discovery-2026-09-23T15-33-59-606Z-617c10e0",
-    "transcriptDigest": "d90b8a1cabf16c89fc0cb2472ff563f78e50c2c16ad4514104a2e3390b6e4c61",
+    "discoveryRunId": "discovery-2026-09-23T17-10-27-841Z-13843906",
+    "transcriptDigest": "a55f24a0cc13df984953d413165f5489f53d3ccb3ecfb464918869d7bb9f1aad",
     "humanEditedSteps": []
   },
   "tenantOverlays": []

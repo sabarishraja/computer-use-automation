@@ -211,8 +211,10 @@ describe('tenant overlays', () => {
     expect(resolved.steps).toHaveLength(base.steps.length);
     expect(resolved.steps.map((s) => s.id)).toEqual(base.steps.map((s) => s.id));
     expect(resolved.surface.entry).toBe('{{env.baseUrl}}/t/harbor/');
-    expect(resolved.policy.allowedOrigins).toContain('http://127.0.0.1:4173/t/harbor');
-    expect(resolved.policy.allowedOrigins).toContain('http://127.0.0.1:4173/t/summit');
+    // An overlay that moves the entry REPLACES the allowlist. Widening it was
+    // what let a run asked for Harbor legally navigate to Summit and report
+    // another institution's data as success.
+    expect(resolved.policy.allowedOrigins).toEqual(['http://127.0.0.1:4173/t/harbor']);
 
     const fillTarget = (resolved.steps[0]!.action as { target: { strategies: Array<{ anchor?: string }> } }).target;
     expect(fillTarget.strategies[0]!.anchor).toBe('Customer Number:');

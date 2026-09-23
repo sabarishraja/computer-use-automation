@@ -33,9 +33,19 @@ export function resolveForTenant(base: Capability, tenantId: string | undefined)
 
 export function applyOverlay(base: Capability, overlay: TenantOverlay): Capability {
   const terms = overlay.terms ?? {};
+  const entry = overlay.entry ?? base.surface.entry;
+  // Re-pointing `surface.entry` alone is not enough: the engine drives the run
+  // from the steps, and the recorded entry navigate carries the BASE tenant's
+  // URL. Left unrewritten, a tenant run silently drives the tenant it was
+  // recorded against and reports another institution's data as success.
+  const retarget = (url: string): string => (url === base.surface.entry ? entry : url);
 
   const steps: Step[] = base.steps.map((step) => {
     let action = step.action;
+
+    if (action.type === 'navigate') {
+      action = { ...action, url: retarget(action.url) };
+    }
 
     if ('target' in action && action.target) {
       let target = localiseLocator(action.target as Locator, terms);
@@ -60,14 +70,20 @@ export function applyOverlay(base: Capability, overlay: TenantOverlay): Capabili
 
   return {
     ...base,
-    surface: { ...base.surface, entry: overlay.entry ?? base.surface.entry },
+    surface: { ...base.surface, entry },
     steps,
     outcomes,
     successCondition: localiseCondition(base.successCondition, terms),
     globalRecovery: [...overlay.extraRecovery, ...base.globalRecovery.map((r) => localiseRecovery(r, terms))],
     policy: {
       ...base.policy,
-      allowedOrigins: dedupe([...base.policy.allowedOrigins, ...overlay.allowedOrigins]),
+      // An overlay that moves the entry REPLACES the origin allowlist rather
+      // than widening it. Unioning is what made navigating to the recorded
+      // tenant legal from inside a run asked for a different one.
+      allowedOrigins:
+        overlay.entry && overlay.allowedOrigins.length > 0
+          ? dedupe(overlay.allowedOrigins)
+          : dedupe([...base.policy.allowedOrigins, ...overlay.allowedOrigins]),
     },
   };
 }

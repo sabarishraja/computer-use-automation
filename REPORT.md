@@ -173,7 +173,8 @@ is unaffected by 1.1.0 landing. New recordings are `draft`; unattended replay re
 
 1. **Ranked semantic-first locators.** No coordinates, no recorded DOM path as the primary handle.
 2. **No sleeps.** Every wait is "until this declared condition holds, or this deadline passes".
-   There is not one fixed sleep in the replay path, which is what keeps a slow tenant from being a
+   There is no unconditional sleep in the replay path — the only sleeps are poll intervals inside
+   deadline-bounded waits — which is what keeps a slow tenant from being a
    flaky tenant. The resolver retries the whole ranked list until its deadline rather than
    blocking inside one strategy, so a page that is 200 ms late does not permanently downgrade the
    run to a fragile fallback.

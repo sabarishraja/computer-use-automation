@@ -1,5 +1,6 @@
 import type { Action, Capability, RiskClass } from '../artifact/schema.js';
 import { riskRank } from '../artifact/schema.js';
+import { originPrefixMatches } from './origins.js';
 
 /**
  * ============================================================================
@@ -89,7 +90,7 @@ export class PolicyEngine {
     } catch {
       return { effect: 'deny', reason: `not a valid absolute URL: ${url}`, code: 'ORIGIN_NOT_ALLOWED' };
     }
-    const originOk = this.cfg.allowedOrigins.some((a) => u.origin === a || (u.origin + u.pathname).startsWith(a));
+    const originOk = this.cfg.allowedOrigins.some((a) => originPrefixMatches(u, a));
     if (!originOk) {
       return { effect: 'deny', reason: `origin ${u.origin} is not in the allowlist`, code: 'ORIGIN_NOT_ALLOWED' };
     }
