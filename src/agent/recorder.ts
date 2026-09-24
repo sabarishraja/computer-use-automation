@@ -235,6 +235,9 @@ export class Recorder {
       intent: partial.intent,
       action: partial.action,
       risk: partial.risk,
+      // Recordings never accept a dialog: discovery dismisses, and a human
+      // decides afterwards whether answering one is part of the capability.
+      dialog: 'dismiss',
       recovery: [],
       timeoutMs: partial.timeoutMs,
       optional: false,

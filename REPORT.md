@@ -460,6 +460,48 @@ that declares one.
 
 ---
 
+## What the target app does not do, and what happens when it does
+
+I built both sides. That is a real weakness in this submission and the honest response is to attack
+my own harness rather than to note the risk and move on. Four things real legacy systems do that
+MemberLink otherwise does not are available as armed modes, and every one of them has a committed
+evidence run.
+
+| mode | what it does | result | verdict |
+|---|---|---|---|
+| `renamedfield` | the search input's wire name becomes `TXT0041`, as a vendor minor version really does | **success**, no drift | the ranked list prefers the visual label; `fieldName` was only ever a fallback, so nothing degrades |
+| `multirow` | search answers with three matching households instead of jumping to the record | `checkpoint_failed`, naming what it expected | correct, and a genuine gap: the schema has no vocabulary for "pick the row where X" |
+| `interstitial-sticky` | a maintenance notice that will not clear | `recovery_exhausted`, with the rule reporting `succeeded: false` | correct — and it was wrong until this mode existed (see below) |
+| `confirmdialog` | a native `confirm()` in front of the submit | `checkpoint_failed` quoting the dialog text and naming the fix | correct after a change; silently wrong before it |
+
+Two of those found real defects.
+
+**Recovery never checked whether it had worked.** A rule reported success if its actions *ran*.
+Against a notice that reloads itself, "click Continue" therefore counted as a repair, the run
+carried on, and it died several steps later as `locator_unresolved` — sending a reader hunting for
+a renamed field while the application sat on an unread banner. Recovery now re-evaluates its own
+trigger afterwards, and a rule whose trigger still holds is recorded as `succeeded: false`. A step
+whose recovery gave up fails as `recovery_exhausted` in both the checkpoint and the action paths,
+from one shared definition rather than two divergent ones. This is the same mistake the checkpoint
+rule exists to prevent — acting is not achieving — reappearing one layer down.
+
+**Native dialogs were invisible.** Playwright dismisses them by default, so a `confirm()` in front
+of a write turned into "the click did nothing", with no trace of why. The surface now records
+every dialog and what was answered, and a step declares `dialog: "dismiss" | "accept"`. Dismiss is
+the default deliberately: accepting an unread dialog is exactly the improvisation this design
+refuses, and on a back-office screen the dialog is often the last thing standing between the
+automation and something nobody authorised. A step that must answer one says so, and that consent
+is visible in the artifact diff. When a dismissed dialog explains a failure, the error quotes the
+dialog and names the one-line fix.
+
+What remains genuinely soft about the target app, stated plainly rather than discovered by a
+reviewer: it runs **no client-side JavaScript** outside the armed `confirmdialog` mode, so every
+interaction is a form POST and a full page load. `settle()` waits for `domcontentloaded` and
+nothing more. Against an AJAX-refreshed grid or a JS-driven frame swap that is not enough, and the
+determinism claim is therefore demonstrated against a surface that is hostile to *markup*-based
+automation while being friendly to *timing*-based automation. Fixing that honestly means a
+different target app, not a different wait.
+
 ## Cuts
 
 **Deliberately not built, with the seam left clean.**

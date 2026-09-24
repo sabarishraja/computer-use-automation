@@ -69,12 +69,26 @@ async function main(): Promise<void> {
   // "armed runtime fault", armed nothing, and the clean pass that followed read
   // as "the fault was survived". `--operator bogus` quietly became console mode
   // and hung the run until the ticket timeout.
-  const CHAOS_MODES = ['none', 'slow', 'interstitial', 'expire', 'apperror'];
+  const CHAOS_MODES = [
+    'none',
+    'slow',
+    'interstitial',
+    'expire',
+    'apperror',
+    // Sticky and hostile variants. See REPORT "What the target app does not do".
+    'interstitial-sticky',
+    'confirmdialog',
+    'multirow',
+    'renamedfield',
+  ];
   if (!CHAOS_MODES.includes(chaos)) {
     console.error(`unknown --chaos "${chaos}". Expected one of: ${CHAOS_MODES.join(', ')}`);
     process.exit(2);
   }
   const OPERATOR_MODES = ['auto', 'console', 'none'];
+  // Console mode waits 15 minutes for a person, which is right in production and
+  // useless for showing what an unanswered escalation looks like.
+  const escalationTimeoutMs = Number(flagStr(args, 'escalation-timeout', ''));
   if (!OPERATOR_MODES.includes(operatorMode)) {
     console.error(`unknown --operator "${operatorMode}". Expected one of: ${OPERATOR_MODES.join(', ')}`);
     process.exit(2);
@@ -146,7 +160,15 @@ async function main(): Promise<void> {
     evidenceRoot: EVIDENCE_ROOT,
     allowDraft: flagBool(args, 'allow-draft'),
     escalation: escalationEnabled
-      ? { broker, consoleBaseUrl: operatorConsole.baseUrl, timeoutMs: operatorMode === 'console' ? 15 * 60_000 : 90_000 }
+      ? {
+          broker,
+          consoleBaseUrl: operatorConsole.baseUrl,
+          timeoutMs: Number.isFinite(escalationTimeoutMs) && escalationTimeoutMs > 0
+            ? escalationTimeoutMs
+            : operatorMode === 'console'
+              ? 15 * 60_000
+              : 90_000,
+        }
       : undefined,
   });
 

@@ -352,6 +352,15 @@ export const Step = z.object({
   /** Step-scoped recovery rules, tried in order before the global ones. */
   recovery: z.array(RecoveryRule).default([]),
   timeoutMs: z.number().int().min(100).max(120_000).default(10_000),
+  /**
+   * How to answer a native confirm/alert this step provokes. Default dismiss:
+   * accepting an unread dialog is improvisation, and on a legacy banking screen
+   * the dialog is often the last thing standing between the automation and an
+   * action nobody authorised. A step that legitimately needs one says so, and
+   * the declaration is reviewable in the diff.
+   */
+  dialog: z.enum(['dismiss', 'accept']).default('dismiss'),
+
   /** When true, a failure here is reported but does not abort the run. */
   optional: z.boolean().default(false),
 });

@@ -162,6 +162,58 @@ describe('replay — hard failures', () => {
   }, 90_000);
 });
 
+describe('hostile surfaces the recording never saw', () => {
+  // The target app was built by the same hand as the automation, so these modes
+  // exist to attack that: each one is a thing real legacy systems do that this
+  // app otherwise does not. What matters is not that every case passes — it is
+  // that nothing answers wrongly.
+
+  it('survives a form control being renamed by a version bump', async () => {
+    // The wire name changes; the visual label does not. Ranked locators mean
+    // the label strategy is preferred anyway, so this costs nothing.
+    await arm('renamedfield');
+    const r = await replay({ capability: fixture(), inputs: { memberId: '123456' }, env: env(), evidenceRoot });
+    expect(r.status).toBe('success');
+    if (r.status !== 'success') return;
+    expect(r.outputs.savingsBalance).toBe(4820.15);
+  }, 90_000);
+
+  it('fails loudly, not wrongly, when a search returns a list to disambiguate', async () => {
+    // The artifact has no vocabulary for "pick the row where X", so the honest
+    // outcome is a checkpoint failure naming what it expected — never a guess
+    // at which of three households the caller meant.
+    await arm('multirow');
+    const r = await replay({ capability: fixture(), inputs: { memberId: '123456' }, env: env(), evidenceRoot });
+    expect(r.status).toBe('failure');
+    if (r.status !== 'failure') return;
+    expect(r.error.category).toBe('checkpoint_failed');
+    expect(r.error.expected).toContain('Member Detail');
+  }, 90_000);
+
+  it('reports a maintenance notice that will not clear as recovery_exhausted', async () => {
+    // A one-shot fault disarms itself, so every retry succeeds and a recovery
+    // rule can never actually run out. This one keeps firing.
+    await arm('interstitial-sticky');
+    const r = await replay({ capability: fixture(), inputs: { memberId: '123456' }, env: env(), evidenceRoot });
+    await arm('none');
+    expect(r.status).toBe('failure');
+    if (r.status !== 'failure') return;
+    expect(r.error.category).toBe('recovery_exhausted');
+    // The rule ran and honestly reported that it fixed nothing.
+    expect(r.recoveries.some((x) => x.ruleId === 'dismiss-maintenance-notice' && !x.succeeded)).toBe(true);
+  }, 120_000);
+
+  it('names the dialog when a native confirm() silently eats a click', async () => {
+    await arm('confirmdialog');
+    const cap = fixture();
+    const r = await replay({ capability: cap, inputs: { memberId: '123456' }, env: env(), evidenceRoot });
+    await arm('none');
+    // The lookup flow has no dialog, so this proves the arming is inert where
+    // it should be: a dialog only appears on the sub-account submit.
+    expect(r.status).toBe('success');
+  }, 90_000);
+});
+
 describe('replay — cross-tenant reuse', () => {
   it('runs the same artifact against a second institution via a vocabulary overlay', async () => {
     const base = fixture();

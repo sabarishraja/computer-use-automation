@@ -17,7 +17,17 @@ export type ChaosMode =
   | 'slow' // transient 4.5s stall on search  -> recoverable
   | 'interstitial' // unexpected maintenance notice    -> recoverable
   | 'expire' // session invalidated              -> recoverable (re-auth)
-  | 'apperror'; // HTTP 500 system error            -> hard failure
+  | 'apperror' // HTTP 500 system error            -> hard failure
+  /**
+   * Sticky variants. The one-shot faults above disarm themselves on first
+   * trigger, so every retry is guaranteed to succeed and a recovery rule can
+   * never actually run out of attempts. These keep firing until disarmed, which
+   * is what a real outage does.
+   */
+  | 'interstitial-sticky' // maintenance notice that will not clear -> recovery_exhausted
+  | 'confirmdialog' // native confirm() before a write        -> see below
+  | 'multirow' // search returns a list to disambiguate  -> see below
+  | 'renamedfield'; // form control renamed by a version bump -> locator drift
 
 type Session = {
   id: string;
@@ -74,6 +84,11 @@ function fire(mode: ChaosMode): boolean {
     return true;
   }
   return false;
+}
+
+/** A sticky fault stays armed, so a retry meets it again. */
+function armed(mode: ChaosMode): boolean {
+  return ARMED === mode;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -304,7 +319,9 @@ function searchPage(t: TenantConfig, banner: string): string {
       '/search"><table class="form">' +
       '<tr><td>' +
       t.terms.subject +
-      ' Number:</td><td><input type="text" name="mbr_no" size="10" maxlength="6"></td></tr>' +
+      ' Number:</td><td><input type="text" name="' +
+      (armed('renamedfield') ? 'TXT0041' : 'mbr_no') +
+      '" size="10" maxlength="6"></td></tr>' +
       '<tr><td>Last Name:</td><td><input type="text" name="lname" size="20"></td></tr>' +
       '<tr><td></td><td><input type="submit" value="' +
       t.terms.searchButton +
@@ -318,6 +335,16 @@ app.get('/t/:tenant/search', (req, res) => {
   if (!t) return res.status(404).send('unknown tenant');
   const s = requireSession(req, res, t);
   if (!s) return;
+  if (armed('interstitial-sticky')) {
+    return res.type('html').send(
+      chrome(
+        t,
+        'System Notice',
+        '<div class="warn"><b>Scheduled maintenance</b> begins shortly. Processing is unavailable.</div>' +
+          '<div style="margin:10px"><form method="get"><input type="submit" value="Continue"></form></div>',
+      ),
+    );
+  }
   if (fire('interstitial')) {
     return res.redirect(base(t) + '/maintenance?next=' + encodeURIComponent(base(t) + '/search'));
   }
@@ -344,12 +371,33 @@ app.post('/t/:tenant/search', async (req, res) => {
   }
   if (fire('slow')) await sleep(4500);
 
-  const raw = String((req.body as Record<string, string>).mbr_no ?? '').trim();
+  const bodyIn = req.body as Record<string, string>;
+  const raw = String(bodyIn.mbr_no ?? bodyIn.TXT0041 ?? '').trim();
 
   if (!/^\d{6}$/.test(raw)) {
     return res.type('html').send(searchPage(t, '<div class="err">' + t.terms.subject + ' number must be exactly 6 digits.</div>'));
   }
   const m = MEMBERS[raw];
+  if (m && armed('multirow')) {
+    // Two households share a surname; the operator picks. A recorded flow that
+    // assumes the search lands on the record cannot express this choice.
+    const others = Object.values(MEMBERS).filter((x) => x.number !== m.number && !x.restricted).slice(0, 2);
+    const rows = [m, ...others]
+      .map(
+        (x) =>
+          '<tr><td><a href="' + base(t) + '/member/' + x.number + '">' + x.number + '</a></td>' +
+          '<td>' + x.name + '</td><td>' + x.branch + '</td></tr>',
+      )
+      .join('');
+    return res.type('html').send(
+      chrome(
+        t,
+        t.terms.subject + ' Search Results',
+        '<div class="warn">3 records matched. Select one to continue.</div>' +
+          '<table class="grid"><tr><th>' + t.terms.subject + '</th><th>Name</th><th>Branch</th></tr>' + rows + '</table>',
+      ),
+    );
+  }
   if (!m) {
     return res
       .type('html')
@@ -423,7 +471,9 @@ function subAccountForm(t: TenantConfig, id: string, name: string, banner: strin
       '<option value="CERTIFICATE">CERTIFICATE</option>' +
       '</select></td></tr>' +
       '<tr><td>Opening Deposit:</td><td><input type="text" name="deposit" size="12"></td></tr>' +
-      '<tr><td></td><td><input type="submit" value="Submit"></td></tr>' +
+      '<tr><td></td><td><input type="submit" value="Submit"' +
+      (armed('confirmdialog') ? ' onclick="return confirm(&quot;Open a new sub-account for this member?&quot;);"' : '') +
+      '></td></tr>' +
       '</table></form>',
   );
 }

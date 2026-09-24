@@ -986,6 +986,14 @@
                 "maximum": 120000,
                 "default": 10000
               },
+              "dialog": {
+                "type": "string",
+                "enum": [
+                  "dismiss",
+                  "accept"
+                ],
+                "default": "dismiss"
+              },
               "optional": {
                 "type": "boolean",
                 "default": false

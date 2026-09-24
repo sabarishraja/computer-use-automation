@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import type { Redactor } from '../policy/redaction.js';
@@ -96,6 +96,22 @@ export class RunLogger {
 
   snapPath(label: string): string {
     return join(this.dir, `${String(this.seq).padStart(3, '0')}-${slug(label)}.html`);
+  }
+
+  /**
+   * Scrub a file the surface driver wrote directly. A DOM snapshot is page
+   * source, so it carries every value on the screen — and it was landing beside
+   * a fully redacted run.jsonl with none of the same treatment. Redaction that
+   * covers the log but not the file next to it is not redaction.
+   */
+  redactFileInPlace(path: string | undefined): void {
+    if (!path) return;
+    try {
+      const raw = readFileSync(path, 'utf8');
+      writeFileSync(path, this.redactor.text(raw), 'utf8');
+    } catch {
+      /* a snapshot that could not be reread is not worth failing a run over */
+    }
   }
 
   writeResult(result: unknown): string {

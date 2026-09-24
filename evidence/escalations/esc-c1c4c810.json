@@ -1,0 +1,21 @@
+{
+  "runId": "replay-2026-09-24T20-15-34-668Z-23c5410b",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "stepId": "s07-click",
+  "stepIntent": "Search for the member",
+  "stepIndex": 7,
+  "stepCount": 9,
+  "reason": "unknown_state",
+  "detail": "Step 7/9 \"Search for the member\" ran, but the expected state did not appear.\nExpected: page text contains \"Member Detail\"\nObserved: text \"Member Detail\" absent",
+  "askedOf": "Look at the screen. If the application is asking for something the automation cannot supply, do it yourself and release with \"mark step done\". Otherwise release with \"resume\" to retry the step, or abort.",
+  "url": "http://127.0.0.1:4173/t/summit/",
+  "screenshot": "030-escalation-s07-click.png",
+  "sessionEndpoint": "in-process",
+  "ticketId": "esc-c1c4c810",
+  "createdAt": "2026-09-24T20:16:05.433Z",
+  "status": "resolved",
+  "operatorActions": [],
+  "disposition": "abort",
+  "operatorNotes": "no operator responded before the timeout"
+}

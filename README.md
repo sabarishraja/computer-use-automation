@@ -254,6 +254,14 @@ docs/capability.schema.json   generated JSON Schema for the artifact
 `--param k=v` (repeatable) · `--tenant <id>` · `--chaos slow|interstitial|expire|apperror` ·
 `--operator auto|console|none` · `--headed` · `--allow-draft` · `--base-url <url>`
 
+`--chaos` also takes the hostile modes used to attack the harness itself —
+`interstitial-sticky` (a notice that will not clear → `recovery_exhausted`), `multirow` (a search
+that returns a list to disambiguate → a loud `checkpoint_failed`), `renamedfield` (a form control
+renamed by a version bump → survives, because the label strategy is preferred) and `confirmdialog`
+(a native `confirm()` in front of a write → a failure that quotes the dialog and names the fix).
+REPORT.md explains what each one found. `--escalation-timeout <ms>` shortens the wait for a human
+so an unanswered escalation can be demonstrated in seconds rather than fifteen minutes.
+
 `--chaos` and `--operator` reject an unrecognised value rather than accepting it silently.
 
 Exit codes: `0` success · `3` business outcome · `1` failure · `2` usage.
@@ -270,12 +278,15 @@ Declared values — inputs, credentials, and any value bound to a declared outpu
 with the redactor before the first log line and scrubbed on the way to disk. Replay evidence is
 clean of PII and financial values by construction, and a test asserts it.
 
-Discovery transcripts are the documented exception, and the limit is worth stating plainly: a
-transcript contains the page text the model was shown, and the redactor can only scrub values it
-was told about. A capability that declares a name as an output has that name redacted everywhere;
+Captured page content is the documented exception, and the limit is worth stating plainly: a
+discovery transcript holds the page text the model was shown, a failure DOM snapshot holds the
+page source, and the redactor can only scrub values it was told about. Both are scrubbed of every
+registered value — inputs, credentials, and any value bound to a declared output — but a run that
+fails at step 7 never extracted the name on the screen, so the snapshot beside it still shows it. A capability that declares a name as an output has that name redacted everywhere;
 `memberlink.open-sub-account` declares only a reference number, so the member name it happened to
 read on the way past survives in that transcript as incidental page text. This is why transcripts
-live outside the artifact, carry only a digest into it, and are treated as regulated data with the
-same retention as the source system. Scrubbing arbitrary unlabelled PII out of page text would
+and snapshots live outside the artifact, carry only a digest into it, are captured on failure
+rather than routinely, and are treated as regulated data with the same retention as the source
+system. Scrubbing arbitrary unlabelled PII out of page text would
 need a classifier, and a classifier that is 98% right is not a control you can put in front of a
 regulator.

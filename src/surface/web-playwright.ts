@@ -82,6 +82,8 @@ export class WebSurface implements Surface {
   private scopeStartedAt = Date.now();
   /** ref -> where to find the control again, from the most recent observation. */
   private refs = new Map<string, { framePath: string[]; xpath: string }>();
+  private dialogPolicy: 'dismiss' | 'accept' = 'dismiss';
+  private dialogs: Array<{ message: string; answered: 'accepted' | 'dismissed' }> = [];
 
   private constructor(private readonly opts: WebSurfaceOptions) {}
 
@@ -116,6 +118,14 @@ export class WebSurface implements Surface {
     });
 
     s.page = await s.context.newPage();
+    // Without a handler Playwright dismisses dialogs silently, so a confirm()
+    // in front of a submit turns into "the click did nothing" with no trace of
+    // why. Recording the dialog is what makes that diagnosable.
+    s.page.on('dialog', (d) => {
+      const answered = s.dialogPolicy === 'accept' ? 'accepted' : 'dismissed';
+      s.dialogs.push({ message: d.message(), answered });
+      void (answered === 'accepted' ? d.accept() : d.dismiss()).catch(() => {});
+    });
     s.page.on('response', (r) => {
       if (!r.request().isNavigationRequest()) return;
       s.lastStatus = r.status();
@@ -143,6 +153,15 @@ export class WebSurface implements Surface {
 
   beginScope(): void {
     this.scopeStartedAt = Date.now();
+    this.dialogs = [];
+  }
+
+  setDialogPolicy(policy: 'dismiss' | 'accept'): void {
+    this.dialogPolicy = policy;
+  }
+
+  dialogsSeen(): Array<{ message: string; answered: 'accepted' | 'dismissed' }> {
+    return [...this.dialogs];
   }
 
   async currentUrl(): Promise<string> {

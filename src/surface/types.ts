@@ -130,6 +130,17 @@ export interface Surface {
   snapshot(path: string): Promise<string | undefined>;
 
   /**
+   * How to answer a native dialog (confirm/alert/prompt) raised by the next
+   * action, and what was answered. Dismissing is the default because accepting
+   * an unread dialog on a banking screen is exactly the kind of improvisation
+   * this design refuses; a step that needs one accepts it by declaring so.
+   */
+  setDialogPolicy(policy: 'dismiss' | 'accept'): void;
+
+  /** Dialogs seen since the last `beginScope`, with what was done about them. */
+  dialogsSeen(): Array<{ message: string; answered: 'accepted' | 'dismissed' }>;
+
+  /**
    * Marks the start of a new step. Lets the surface scope per-step
    * observations — notably "did the application return an error status while
    * this step was running", which is otherwise indistinguishable from an error

@@ -212,6 +212,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   const captureFailureEvidence = async (label: string) => {
     const shot = await surface.screenshot(logger.shotPath(label));
     const snap = await surface.snapshot(logger.snapPath(label));
+    logger.redactFileInPlace(snap);
     return {
       screenshotPath: shot ? relative(process.cwd(), shot) : undefined,
       snapshotPath: snap ? relative(process.cwd(), snap) : undefined,
@@ -258,6 +259,16 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   const rulesFor = (step: Step): RecoveryRule[] => [...step.recovery, ...cap.globalRecovery];
 
   /**
+   * Has recovery for this step given up? Either a rule burned its attempts, or
+   * a rule ran and its own trigger still held afterwards. Both mean the state
+   * was never repaired, and the failure belongs to recovery rather than to
+   * whatever the run tripped over next.
+   */
+  const recoveryGaveUp = (step: Step): boolean =>
+    rulesFor(step).some((r) => (recoveryAttempts.get(`${step.id}:${r.id}`) ?? 0) >= r.maxAttempts) ||
+    recoveries.some((r) => r.stepId === step.id && !r.succeeded);
+
+  /**
    * Try each applicable recovery rule whose trigger currently holds.
    * Bounded twice over: by `maxAttempts` per rule and by the fixed action list
    * the rule declares. Recovery can never become an improvising agent.
@@ -275,12 +286,32 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
 
       let ok = true;
       for (const a of rule.do) {
-        const r = await runAction(step, a, rule.maxAttempts === 0 ? 5000 : 15_000);
+        const r = await runAction(step, a, 15_000);
         if (!r.ok) {
           ok = false;
           break;
         }
       }
+
+      // Running the actions is not the same as fixing the state. A "Continue"
+      // button that reloads the same maintenance notice used to count as a
+      // recovery, so a condition that never cleared was reported as repaired
+      // and the run then failed somewhere else with an unrelated category.
+      // The rule's own trigger is the test of whether it worked.
+      if (ok) {
+        const still = await surface.evaluate(rule.when, 0);
+        if (still.held) {
+          ok = false;
+          logger.log({
+            type: 'recovery.applied',
+            stepId: step.id,
+            ruleId: rule.id,
+            attempt: used + 1,
+            description: `${rule.description} — trigger still holds afterwards, so this did not recover anything`,
+          });
+        }
+      }
+
       recoveries.push({ stepId: step.id, ruleId: rule.id, description: rule.description, attempt: used + 1, succeeded: ok });
       if (ok) return true;
     }
@@ -582,6 +613,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       }
 
       /* -- action, with one bounded recovery retry -- */
+      surface.setDialogPolicy(step.dialog);
       if (!stepAlreadyDone) {
         let result = await runAction(step, step.action, step.timeoutMs);
 
@@ -597,6 +629,11 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         if (!result.ok) {
           // Last resort before failing: ask a human, if one is available.
           const isLocator = (result.error ?? '').startsWith('could not resolve');
+          // A control that is missing because a recovery rule could not clear
+          // the screen in front of it is not UI drift. Attributing it to the
+          // locator sends an engineer hunting for a renamed field while the
+          // application is sitting on a maintenance notice.
+          const recoveryStuck = recoveryGaveUp(step);
           const res = await escalate(
             isLocator ? 'locator_unresolved' : 'unknown_state',
             `Step ${index + 1}/${cap.steps.length} "${step.intent}" could not be performed. ${result.error}`,
@@ -605,7 +642,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
             index,
           );
           if ('aborted' in res) {
-            return await fail(isLocator ? 'locator_unresolved' : 'action_failed', {
+            return await fail(recoveryStuck ? 'recovery_exhausted' : isLocator ? 'locator_unresolved' : 'action_failed', {
               message: result.error ?? 'action failed',
               stepId: step.id,
               stepIntent: step.intent,
@@ -718,16 +755,25 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
           // An application error page is its own category. Reporting a 500 as
           // "checkpoint_failed" would send an on-call engineer looking for UI
           // drift when the application itself is down.
+          // A dismissed confirm() is the commonest reason a click "did nothing".
+          // Saying so turns an afternoon of locator archaeology into a one-line
+          // artifact change.
+          const dismissed = surface.dialogsSeen().filter((d) => d.answered === 'dismissed');
           const appErr = await surface.evaluate({ kind: 'httpStatusAtLeast', status: 500 }, 0);
-          const exhausted = rulesFor(step).some((r) => (recoveryAttempts.get(`${step.id}:${r.id}`) ?? 0) >= r.maxAttempts);
+          const exhausted = recoveryGaveUp(step);
           const category = appErr.held ? 'app_error' : exhausted ? 'recovery_exhausted' : 'checkpoint_failed';
           return await fail(category, {
-            message: `step "${step.id}" (${step.intent}) did not reach its expected state`,
+            message:
+              dismissed.length > 0
+                ? `step "${step.id}" (${step.intent}) did not reach its expected state: the application raised a dialog ` +
+                  `(${JSON.stringify(dismissed[0]!.message)}) and it was dismissed. If this step should answer it, ` +
+                  `declare "dialog": "accept" on the step.`
+                : `step "${step.id}" (${step.intent}) did not reach its expected state`,
             stepId: step.id,
             stepIntent: step.intent,
             stepIndex: index + 1,
             expected: describe(step.checkpoint),
-            observed: cp.detail,
+            observed: dismissed.length > 0 ? `${cp.detail}; dialog dismissed: ${dismissed[0]!.message}` : cp.detail,
           });
         }
       }
