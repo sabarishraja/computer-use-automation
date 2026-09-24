@@ -396,6 +396,40 @@ expect it — and it reuses the escalation channel, so there is one control-tran
 two. **Discovery never performs an irreversible action at all**: a recording run must not move
 money, so the agent is told to reach the confirmation screen and stop.
 
+That constraint leaves a hole the schema has to close. If the model can never record the final
+post, something else has to author it — so `memberlink.open-sub-account@1.1.0` takes the recorded
+1.0.0 steps and appends the post as a **human-authored step**, listed in
+`provenance.humanEditedSteps`. The division is the honest one: the model contributes the path it
+can safely discover, a person contributes the step that moves money, and the artifact records who
+wrote what. Both versions ship, so a caller pinned to 1.0.0 still stops at confirmation.
+
+**Idempotency is declared, because after an ambiguous failure nobody can tell whether a write
+landed.** `checkpoint_failed` on a submit means the click happened and the expected screen did
+not, which is exactly the state where a retry might post twice. Encoding "do not retry" in the
+error taxonomy is a counsel of despair; the useful thing is to let the artifact say how to find
+out. A step may declare:
+
+```
+idempotency: { key, guard, outcome }
+```
+
+`guard` is a condition that holds *when the write has already been applied*, evaluated on the
+screen before the step acts, with the caller's values rendered in. When it holds, replay reports
+the declared business outcome and does nothing — `SUB_ACCOUNT_EXISTS` rather than a second
+account. The guard sits on the first step that changes anything rather than on the commit itself,
+because the member detail screen is the last screen that can answer the question; by the time you
+are on the confirmation page, the app no longer shows you what the member already owns. Only the
+capability knows that, which is why this is artifact data and not engine cleverness.
+
+`validateCapability` warns when a `write_irreversible` step carries no guard. It is a warning and
+not an error because some writes genuinely have no detectable trace, and a rule that cannot be
+satisfied is a rule people learn to ignore.
+
+The target application does **not** deduplicate: posting the same sub-account twice appends a
+second row, and the member's detail screen shows both. That is deliberate. Had the mock quietly
+swallowed duplicates, the guard could be deleted and every test would still pass, and the
+guarantee would be fiction. A test asserts the duplicate is observable.
+
 **Data handling.** Two mechanisms, because either alone is insufficient. *Declared* redaction is
 driven by the artifact's `sensitivity` fields — exact values registered before the first log line
 and scrubbed wherever they appear, in a log line, a page-text excerpt, an error message or an

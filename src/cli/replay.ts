@@ -29,6 +29,16 @@ function playbooks(): OperatorPlaybook[] {
       notes: 'Supervisor override authorised for a deposit above the branch limit.',
     },
     {
+      // The irreversible post. The supervisor does NOT press the button: they
+      // approve, and the automation performs the step it was going to perform.
+      // "Resume" rather than "step done" keeps the checkpoint honest — the
+      // engine still has to see the posted screen before it calls this a
+      // success, whatever the human says happened.
+      when: 'confirm and post',
+      disposition: 'resume',
+      notes: 'Supervisor reviewed the confirmation screen and authorised posting the sub-account.',
+    },
+    {
       when: 'operator id',
       type: { 'Operator ID': process.env.CUA_SECRET_OPERATOR_ID ?? 'OPR001', Password: process.env.CUA_SECRET_OPERATOR_PASSWORD ?? '' },
       click: ['Sign On'],

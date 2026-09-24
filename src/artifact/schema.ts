@@ -325,6 +325,30 @@ export const Step = z.object({
   precondition: Condition.optional(),
   /** Must hold after the action. This is what makes a step verified rather than assumed. */
   checkpoint: Condition.optional(),
+  /**
+   * Makes a write safe to re-run. A caller that gets an ambiguous failure —
+   * `checkpoint_failed` after a submit, a timeout mid-post — has no way to know
+   * whether the write landed, and the honest answer for an irreversible step
+   * has until now been "do not retry, ask a human". This lets the artifact say
+   * how to find out:
+   *
+   *   key    what the write is keyed on, as a template. Recorded in evidence so
+   *          two runs of the same logical operation are correlatable.
+   *   guard  a condition that holds WHEN THE WRITE HAS ALREADY BEEN APPLIED,
+   *          evaluated on the screen before the step runs.
+   *   outcome the declared business outcome to report instead of acting again.
+   *
+   * The guard is deliberately the artifact's job rather than the engine's: only
+   * the capability knows which screen shows that the work is already done.
+   */
+  idempotency: z
+    .object({
+      key: z.string().min(1),
+      guard: Condition,
+      outcome: z.string().min(1),
+    })
+    .optional(),
+
   /** Step-scoped recovery rules, tried in order before the global ones. */
   recovery: z.array(RecoveryRule).default([]),
   timeoutMs: z.number().int().min(100).max(120_000).default(10_000),
@@ -554,6 +578,33 @@ export function validateCapability(cap: Capability): ValidationIssue[] {
         level: 'error',
         message: `step "${step.id}" is ${step.risk} but has no checkpoint`,
         path: `steps[${i}].checkpoint`,
+      });
+    }
+
+    if (step.idempotency) {
+      if (step.risk === 'read') {
+        issues.push({
+          level: 'warning',
+          message: `step "${step.id}" declares idempotency but is a read; the guard will never prevent anything`,
+          path: `steps[${i}].idempotency`,
+        });
+      }
+      if (!cap.outcomes.some((o) => o.code === step.idempotency?.outcome)) {
+        issues.push({
+          level: 'error',
+          message: `step "${step.id}" idempotency reports outcome "${step.idempotency.outcome}", which the capability does not declare`,
+          path: `steps[${i}].idempotency.outcome`,
+        });
+      }
+    }
+
+    // An irreversible step with no idempotency guard cannot be retried safely
+    // by anyone: after an ambiguous failure nobody can tell whether it landed.
+    if (step.risk === 'write_irreversible' && !step.idempotency) {
+      issues.push({
+        level: 'warning',
+        message: `step "${step.id}" is write_irreversible and declares no idempotency guard; a caller retrying after an ambiguous failure could apply it twice`,
+        path: `steps[${i}].idempotency`,
       });
     }
 

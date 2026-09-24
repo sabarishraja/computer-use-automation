@@ -46,6 +46,7 @@ export type LogEvent =
   | { type: 'action.performed'; stepId: string; action: string; ok: boolean; error?: string; ms: number }
   | { type: 'condition'; stepId?: string; role: 'precondition' | 'checkpoint' | 'success' | 'outcome' | 'recovery'; held: boolean; detail: string }
   | { type: 'outcome.detected'; code: string; message: string }
+  | { type: 'idempotency'; stepId: string; key: string; alreadyApplied: boolean; detail: string }
   | { type: 'recovery.applied'; stepId: string; ruleId: string; attempt: number; description: string }
   | { type: 'extract'; stepId: string; field: string; sensitivity: string; value: string }
   | { type: 'escalation.raised'; ticketId: string; reason: string; stepId?: string; screenshot?: string }

@@ -55,3 +55,15 @@ export const MEMBERS: Record<string, Member> = {
 
 /** The only credentials this app accepts. Deliberately fake and non-secret. */
 export const DEMO_OPERATOR = { id: 'OPR001', password: 'training-only' };
+
+/**
+ * The commit route mutates member accounts, which is what makes a double-post
+ * observable. Tests and repeated demo runs need the fixture back.
+ */
+const PRISTINE = JSON.stringify(MEMBERS);
+
+export function resetMembers(): void {
+  const fresh = JSON.parse(PRISTINE) as Record<string, Member>;
+  for (const k of Object.keys(MEMBERS)) delete MEMBERS[k];
+  for (const [k, v] of Object.entries(fresh)) MEMBERS[k] = v;
+}

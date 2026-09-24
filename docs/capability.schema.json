@@ -913,6 +913,28 @@
               "checkpoint": {
                 "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
               },
+              "idempotency": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "guard": {
+                    "$ref": "#/definitions/Capability/properties/steps/items/properties/action/anyOf/6/properties/condition"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "key",
+                  "guard",
+                  "outcome"
+                ],
+                "additionalProperties": false
+              },
               "recovery": {
                 "type": "array",
                 "items": {

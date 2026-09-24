@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { randomUUID } from 'node:crypto';
 import { TENANTS, tenantOr404, type TenantConfig } from './tenants.js';
-import { MEMBERS, DEMO_OPERATOR } from './data.js';
+import { MEMBERS, DEMO_OPERATOR, resetMembers } from './data.js';
 import { chrome, money } from './html.js';
 
 /* ------------------------------------------------------------------ *
@@ -109,6 +109,13 @@ app.get('/', (_req, res) => {
 });
 
 /** Arm a runtime fault for the calling session. Used by the replay demos. */
+app.all('/t/:tenant/__reset', (_req, res) => {
+  // The commit route mutates member accounts so a double-post is visible.
+  // Tests and repeated demo runs need the fixture back.
+  resetMembers();
+  res.type('text').send('reset');
+});
+
 app.all('/t/:tenant/__chaos', (req, res) => {
   const t = tenantOr404(req.params.tenant);
   if (!t) return res.status(404).send('unknown tenant');
@@ -433,6 +440,8 @@ function confirmationPage(t: TenantConfig, id: string, name: string, type: strin
       '<tr><td>Opening Deposit</td><td>' + money(deposit) + '</td></tr>' +
       '<tr><td>Reference</td><td>' + ref + '</td></tr></table>' +
       '<div style="margin:10px"><form method="post" action="/t/' + t.id + '/member/' + id + '/commit" style="display:inline">' +
+      '<input type="hidden" name="acct_type" value="' + escapeAttr(type) + '">' +
+      '<input type="hidden" name="deposit" value="' + escapeAttr(String(deposit)) + '">' +
       '<input type="submit" value="Confirm and Post"></form>&nbsp;<a href="/t/' + t.id + '/member/' + id + '">Cancel</a></div>',
   );
 }
@@ -517,7 +526,34 @@ app.post('/t/:tenant/member/:id/commit', (req, res) => {
   const t = tenantOr404(req.params.tenant);
   if (!t) return res.status(404).send('unknown tenant');
   if (!requireSession(req, res, t)) return;
-  return res.type('html').send(chrome(t, 'Posted', '<div class="ok">Sub-account posted.</div>'));
+  const m = MEMBERS[String(req.params.id)];
+  if (!m) return res.type('html').send(searchPage(t, '<div class="err">No record found.</div>'));
+  const body = req.body as Record<string, string>;
+  const type = String(body.acct_type ?? '');
+  const deposit = Number(String(body.deposit ?? '0').replace(/[$,]/g, ''));
+
+  // The post actually posts. Nothing here deduplicates: committing the same
+  // sub-account twice appends a SECOND row, and the member's detail screen
+  // shows both. An automation that re-runs after an ambiguous failure must
+  // therefore prevent the double-post itself — which is the whole point of
+  // declaring an idempotency guard in the artifact. A target app that
+  // quietly swallowed the duplicate would make a broken automation look fine.
+  const number = String(1 + m.accounts.length).padStart(4, '0');
+  m.accounts.push({ number, type: type || 'VACATION CLUB', balance: Number.isFinite(deposit) ? deposit : 0, status: 'OPEN' });
+  const ref = 'SA-' + (100000 + (Number(m.number) % 100000)).toString();
+
+  return res.type('html').send(
+    chrome(
+      t,
+      'Posted',
+      '<div class="ok">Sub-account posted. Reference ' + ref + '.</div>' +
+        '<table class="grid"><tr><th>Field</th><th>Value</th></tr>' +
+        '<tr><td>Account</td><td>' + number + '</td></tr>' +
+        '<tr><td>Account Type</td><td>' + escapeAttr(type) + '</td></tr>' +
+        '<tr><td>Status</td><td>OPEN</td></tr></table>' +
+        '<div style="margin:10px"><a href="' + base(t) + '/member/' + m.number + '">Back to ' + t.terms.subject + ' Detail</a></div>',
+    ),
+  );
 });
 
 /* --------------------- irreversible action ------------------------ */

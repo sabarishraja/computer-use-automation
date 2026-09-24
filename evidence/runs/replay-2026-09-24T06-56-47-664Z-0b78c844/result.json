@@ -1,0 +1,19 @@
+{
+  "runId": "replay-2026-09-24T06-56-47-664Z-0b78c844",
+  "capabilityId": "memberlink.open-sub-account",
+  "capabilityVersion": "1.1.0",
+  "startedAt": "2026-09-24T06:56:47.663Z",
+  "durationMs": 15886,
+  "stepsAttempted": 8,
+  "stepsTotal": 13,
+  "recoveries": [],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-24T06-56-47-664Z-0b78c844",
+  "status": "business_outcome",
+  "outcome": {
+    "code": "SUB_ACCOUNT_EXISTS",
+    "message": "Member [id:5de1470dae] already holds a VACATION CLUB account; nothing was opened."
+  },
+  "outputs": {}
+}

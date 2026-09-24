@@ -1,0 +1,779 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "memberlink.open-sub-account",
+  "version": "1.1.0",
+  "name": "Open a sub-account and post it",
+  "description": "Given a member number, an account type and an opening deposit, open a sub-account in MemberLink and POST it, returning the reference number. The posting step is irreversible, exceeds the capability\u2019s unattended risk ceiling, and therefore requires a human decision at replay time. Re-running for a member who already holds that product reports SUB_ACCOUNT_EXISTS instead of opening a second one.",
+  "state": "approved",
+  "surface": {
+    "kind": "web",
+    "entry": "{{env.baseUrl}}/t/summit/",
+    "application": {
+      "vendor": "memberlink",
+      "product": "core-servicing",
+      "versionRange": "3.x"
+    },
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    }
+  },
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "description": "The member's 6-digit account number.",
+      "required": true,
+      "sensitivity": "identifier",
+      "pattern": "^\\d{6}$",
+      "example": "123456"
+    },
+    {
+      "name": "accountType",
+      "type": "string",
+      "description": "Product to open.",
+      "required": true,
+      "sensitivity": "public",
+      "enum": [
+        "SHARE SAVINGS",
+        "VACATION CLUB",
+        "CERTIFICATE"
+      ],
+      "example": "VACATION CLUB"
+    },
+    {
+      "name": "openingDeposit",
+      "type": "money",
+      "description": "Opening deposit in USD. Deposits of $1,000 or more require a supervisor override.",
+      "required": true,
+      "sensitivity": "financial",
+      "example": 250
+    }
+  ],
+  "outputs": [
+    {
+      "name": "reference",
+      "type": "string",
+      "description": "Reference number shown on the confirmation screen.",
+      "sensitivity": "public",
+      "required": true
+    }
+  ],
+  "steps": [
+    {
+      "id": "s01-navigate",
+      "intent": "Open {{env.baseUrl}}/t/summit/",
+      "action": {
+        "type": "navigate",
+        "url": "{{env.baseUrl}}/t/summit/"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 20000,
+      "optional": false
+    },
+    {
+      "id": "s02-fill",
+      "intent": "Enter operator ID for sign-on.",
+      "action": {
+        "type": "fill",
+        "target": {
+          "description": "Operator ID",
+          "framePath": [],
+          "strategies": [
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Operator ID:",
+              "anchorMatch": "exact",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Operator ID",
+              "anchorMatch": "contains",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "fieldName",
+              "name": "opid"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Operator ID:",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[1]/td[2]/input"
+            }
+          ]
+        },
+        "value": "{{env.secret_OPERATOR_ID}}"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s03-fill",
+      "intent": "Enter operator password for sign-on.",
+      "action": {
+        "type": "fill",
+        "target": {
+          "description": "Password",
+          "framePath": [],
+          "strategies": [
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Password:",
+              "anchorMatch": "exact",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Password",
+              "anchorMatch": "contains",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "fieldName",
+              "name": "pw"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Password:",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[2]/td[2]/input"
+            }
+          ]
+        },
+        "value": "{{env.secret_OPERATOR_PASSWORD}}"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s04-click",
+      "intent": "Submit sign-on credentials.",
+      "action": {
+        "type": "click",
+        "target": {
+          "description": "Sign On",
+          "framePath": [],
+          "strategies": [
+            {
+              "tier": "semantic",
+              "kind": "role",
+              "role": "button",
+              "name": "Sign On",
+              "match": "exact"
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[3]/td[2]/input"
+            }
+          ]
+        }
+      },
+      "risk": "read",
+      "checkpoint": {
+        "kind": "textPresent",
+        "value": "Welcome, operator",
+        "match": "contains"
+      },
+      "recovery": [],
+      "timeoutMs": 15000,
+      "optional": false
+    },
+    {
+      "id": "s05-click",
+      "intent": "Navigate to Member Search to look up the member.",
+      "action": {
+        "type": "click",
+        "target": {
+          "description": "Member Search",
+          "framePath": [
+            "navFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "semantic",
+              "kind": "role",
+              "role": "link",
+              "name": "Member Search",
+              "match": "exact"
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/table/tbody/tr[2]/td/a"
+            }
+          ]
+        }
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 15000,
+      "optional": false
+    },
+    {
+      "id": "s06-fill",
+      "intent": "Enter the member number to search for.",
+      "action": {
+        "type": "fill",
+        "target": {
+          "description": "Member Number",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Member Number:",
+              "anchorMatch": "exact",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Member Number",
+              "anchorMatch": "contains",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "fieldName",
+              "name": "mbr_no"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Member Number:",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[1]/td[2]/input"
+            }
+          ]
+        },
+        "value": "{{inputs.memberId}}"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s07-click",
+      "intent": "Search for the member.",
+      "action": {
+        "type": "click",
+        "target": {
+          "description": "Search",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "semantic",
+              "kind": "role",
+              "role": "button",
+              "name": "Search",
+              "match": "exact"
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[3]/td[2]/input[1]"
+            }
+          ]
+        }
+      },
+      "risk": "read",
+      "checkpoint": {
+        "kind": "textPresent",
+        "value": "Member Detail",
+        "match": "contains"
+      },
+      "recovery": [],
+      "timeoutMs": 15000,
+      "optional": false
+    },
+    {
+      "id": "s08-click",
+      "intent": "Start opening a new sub-account for this member.",
+      "action": {
+        "type": "click",
+        "target": {
+          "description": "Open Sub-Account",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "semantic",
+              "kind": "role",
+              "role": "link",
+              "name": "Open Sub-Account",
+              "match": "exact"
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/div[3]/a[1]"
+            }
+          ]
+        }
+      },
+      "risk": "write_reversible",
+      "checkpoint": {
+        "kind": "textPresent",
+        "value": "Opening Deposit:",
+        "match": "contains"
+      },
+      "recovery": [],
+      "timeoutMs": 15000,
+      "optional": false,
+      "idempotency": {
+        "key": "{{inputs.memberId}}:{{inputs.accountType}}",
+        "guard": {
+          "kind": "textPresent",
+          "value": "{{inputs.accountType}}",
+          "match": "contains",
+          "framePath": [
+            "mainFrame"
+          ]
+        },
+        "outcome": "SUB_ACCOUNT_EXISTS"
+      }
+    },
+    {
+      "id": "s09-select",
+      "intent": "Select the requested account type for the sub-account.",
+      "action": {
+        "type": "select",
+        "target": {
+          "description": "Account Type",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Account Type:",
+              "anchorMatch": "exact",
+              "direction": "following",
+              "control": "combobox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Account Type",
+              "anchorMatch": "contains",
+              "direction": "following",
+              "control": "combobox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "fieldName",
+              "name": "acct_type"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Account Type:",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[1]/td[2]/select"
+            }
+          ]
+        },
+        "value": "{{inputs.accountType}}"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s10-fill",
+      "intent": "Enter the opening deposit amount.",
+      "action": {
+        "type": "fill",
+        "target": {
+          "description": "Opening Deposit",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Opening Deposit:",
+              "anchorMatch": "exact",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Opening Deposit",
+              "anchorMatch": "contains",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "fieldName",
+              "name": "deposit"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Opening Deposit:",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[2]/td[2]/input"
+            }
+          ]
+        },
+        "value": "{{inputs.openingDeposit}}"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s11-click",
+      "intent": "Submit the sub-account opening request to proceed to confirmation.",
+      "action": {
+        "type": "click",
+        "target": {
+          "description": "Submit",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "semantic",
+              "kind": "role",
+              "role": "button",
+              "name": "Submit",
+              "match": "exact"
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[3]/td[2]/input"
+            }
+          ]
+        }
+      },
+      "risk": "write_reversible",
+      "checkpoint": {
+        "kind": "textPresent",
+        "value": "Review and confirm. No account has been opened yet.",
+        "match": "contains"
+      },
+      "recovery": [],
+      "timeoutMs": 15000,
+      "optional": false
+    },
+    {
+      "id": "s12-extract",
+      "intent": "Extract the reference number shown on the confirmation screen.",
+      "action": {
+        "type": "extract",
+        "target": {
+          "description": "cell control",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Reference",
+              "column": "Value"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Reference",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/table/tbody/tr[5]/td[2]"
+            }
+          ]
+        },
+        "field": "reference",
+        "transform": {
+          "kind": "trim"
+        }
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s13-click",
+      "intent": "Post the sub-account. Irreversible: this is the step that opens the account.",
+      "action": {
+        "type": "click",
+        "target": {
+          "description": "Confirm and Post",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "semantic",
+              "kind": "role",
+              "role": "button",
+              "name": "Confirm and Post",
+              "match": "exact"
+            },
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Review and confirm",
+              "anchorMatch": "contains",
+              "direction": "following",
+              "control": "button",
+              "ordinal": 1
+            }
+          ]
+        }
+      },
+      "risk": "write_irreversible",
+      "checkpoint": {
+        "kind": "textPresent",
+        "value": "Sub-account posted",
+        "match": "contains",
+        "framePath": [
+          "mainFrame"
+        ]
+      },
+      "recovery": [],
+      "timeoutMs": 15000,
+      "optional": false
+    }
+  ],
+  "outcomes": [
+    {
+      "code": "MEMBER_NOT_FOUND",
+      "description": "The member number is well-formed but no such member exists at this institution.",
+      "when": {
+        "kind": "textPresent",
+        "value": "No member record found",
+        "match": "contains"
+      },
+      "message": "No member record exists for {{inputs.memberId}}.",
+      "partialOutputs": []
+    },
+    {
+      "code": "SUB_ACCOUNT_EXISTS",
+      "description": "The member already holds an account of the requested type, so opening another would duplicate it.",
+      "when": {
+        "kind": "textPresent",
+        "value": "No member record found",
+        "match": "contains"
+      },
+      "message": "Member {{inputs.memberId}} already holds a {{inputs.accountType}} account; nothing was opened.",
+      "partialOutputs": []
+    }
+  ],
+  "globalRecovery": [
+    {
+      "id": "dismiss-maintenance-notice",
+      "description": "Clear the scheduled-maintenance interstitial that the app can interpose on any screen.",
+      "when": {
+        "kind": "textPresent",
+        "value": "Scheduled maintenance",
+        "match": "contains"
+      },
+      "do": [
+        {
+          "type": "click",
+          "target": {
+            "description": "Continue button on the maintenance notice",
+            "framePath": [
+              "*"
+            ],
+            "strategies": [
+              {
+                "tier": "semantic",
+                "kind": "role",
+                "role": "button",
+                "name": "Continue",
+                "match": "exact"
+              }
+            ]
+          }
+        }
+      ],
+      "maxAttempts": 2,
+      "scope": "global"
+    },
+    {
+      "id": "re-authenticate",
+      "description": "Sign on again after the application expires the session mid-run.",
+      "when": {
+        "kind": "textPresent",
+        "value": "Your session has expired",
+        "match": "contains"
+      },
+      "do": [
+        {
+          "type": "fill",
+          "target": {
+            "description": "Operator ID field on the sign-on screen",
+            "framePath": [
+              "*"
+            ],
+            "strategies": [
+              {
+                "tier": "structural",
+                "kind": "nearText",
+                "anchor": "Operator ID:",
+                "anchorMatch": "exact",
+                "direction": "following",
+                "control": "textbox",
+                "ordinal": 1
+              },
+              {
+                "tier": "structural",
+                "kind": "fieldName",
+                "name": "opid"
+              }
+            ]
+          },
+          "value": "{{env.secret_OPERATOR_ID}}"
+        },
+        {
+          "type": "fill",
+          "target": {
+            "description": "Password field on the sign-on screen",
+            "framePath": [
+              "*"
+            ],
+            "strategies": [
+              {
+                "tier": "structural",
+                "kind": "nearText",
+                "anchor": "Password:",
+                "anchorMatch": "exact",
+                "direction": "following",
+                "control": "textbox",
+                "ordinal": 1
+              },
+              {
+                "tier": "structural",
+                "kind": "fieldName",
+                "name": "pw"
+              }
+            ]
+          },
+          "value": "{{env.secret_OPERATOR_PASSWORD}}"
+        },
+        {
+          "type": "click",
+          "target": {
+            "description": "Sign On button",
+            "framePath": [
+              "*"
+            ],
+            "strategies": [
+              {
+                "tier": "semantic",
+                "kind": "role",
+                "role": "button",
+                "name": "Sign On",
+                "match": "exact"
+              }
+            ]
+          }
+        }
+      ],
+      "maxAttempts": 1,
+      "scope": "global"
+    }
+  ],
+  "successCondition": {
+    "kind": "textPresent",
+    "value": "Sub-account posted",
+    "match": "contains"
+  },
+  "policy": {
+    "allowedOrigins": [
+      "http://127.0.0.1:4173/t/summit"
+    ],
+    "allowedPathPrefixes": [],
+    "maxUnattendedRisk": "write_reversible",
+    "neverPersist": [],
+    "requiresApprovalState": [
+      "approved"
+    ]
+  },
+  "provenance": {
+    "recordedAt": "2026-09-23T17:12:06.836Z",
+    "recordedBy": "llm-discovery",
+    "goal": "Sign on as the operator, look up member {{inputs.memberId}}, start a new sub-account of the requested type with the requested opening deposit, and reach the confirmation screen. Do not post it.",
+    "model": "claude-sonnet-5",
+    "discoveryRunId": "discovery-2026-09-23T17-10-27-841Z-13843906",
+    "transcriptDigest": "a55f24a0cc13df984953d413165f5489f53d3ccb3ecfb464918869d7bb9f1aad",
+    "humanEditedSteps": [
+      "s08-click",
+      "s13-click"
+    ]
+  },
+  "tenantOverlays": []
+}

@@ -84,6 +84,29 @@ describe('capability validation', () => {
     expect(validateCapability(baseCapability())).toEqual([]);
   });
 
+  it('warns when an irreversible step declares no idempotency guard', () => {
+    // Without a guard, a caller retrying after an ambiguous failure has no way
+    // to know whether the write landed, and no way to find out safely.
+    const cap = baseCapability();
+    cap.steps[0]!.risk = 'write_irreversible';
+    cap.steps[0]!.checkpoint = { kind: 'textPresent', value: 'Posted', match: 'contains' };
+    const warnings = validateCapability(cap).filter((i) => i.level === 'warning');
+    expect(warnings.map((w) => w.message).join()).toMatch(/declares no idempotency guard/);
+  });
+
+  it('rejects an idempotency guard that reports an undeclared outcome', () => {
+    const cap = baseCapability();
+    cap.steps[0]!.risk = 'write_reversible';
+    cap.steps[0]!.checkpoint = { kind: 'textPresent', value: 'Posted', match: 'contains' };
+    cap.steps[0]!.idempotency = {
+      key: '{{inputs.memberId}}',
+      guard: { kind: 'textPresent', value: 'already exists', match: 'contains' },
+      outcome: 'NOT_A_DECLARED_OUTCOME',
+    };
+    const errors = validateCapability(cap).filter((i) => i.level === 'error');
+    expect(errors.map((e) => e.message).join()).toMatch(/which the capability does not declare/);
+  });
+
   it('rejects an extract into an undeclared output', () => {
     const cap = baseCapability();
     (cap.steps[1]!.action as { field: string }).field = 'notDeclared';

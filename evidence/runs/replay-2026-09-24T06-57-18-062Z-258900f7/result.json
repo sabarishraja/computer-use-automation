@@ -1,0 +1,34 @@
+{
+  "runId": "replay-2026-09-24T06-57-18-062Z-258900f7",
+  "capabilityId": "memberlink.open-sub-account",
+  "capabilityVersion": "1.1.0",
+  "startedAt": "2026-09-24T06:57:18.062Z",
+  "durationMs": 74789,
+  "stepsAttempted": 13,
+  "stepsTotal": 13,
+  "recoveries": [],
+  "escalations": [
+    {
+      "ticketId": "esc-3b9be1d1",
+      "reason": "unknown_state",
+      "stepId": "s11-click",
+      "disposition": "resume_step_done",
+      "operatorActions": 2,
+      "waitedMs": 8673
+    },
+    {
+      "ticketId": "esc-7b991588",
+      "reason": "confirmation_required",
+      "stepId": "s13-click",
+      "disposition": "resume",
+      "operatorActions": 2,
+      "waitedMs": 4566
+    }
+  ],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-24T06-57-18-062Z-258900f7",
+  "status": "success",
+  "outputs": {
+    "reference": "SA-[id:eb05dd50a5]"
+  }
+}

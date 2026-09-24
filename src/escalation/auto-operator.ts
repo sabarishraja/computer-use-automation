@@ -116,7 +116,10 @@ export async function runAutoOperator(opts: AutoOperatorOptions): Promise<{ hand
     });
     log(`[operator] released ${open.ticketId} as ${play.disposition}`);
     handled++;
-    return { handled };
+    // Keep watching. A single run can need a supervisor twice — an override for
+    // the deposit, then an authorisation for the irreversible post — and
+    // returning after the first left the second waiting out the full ticket
+    // timeout. The run's own abort signal is what ends this loop.
   }
 
   return { handled };

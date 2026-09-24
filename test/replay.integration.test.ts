@@ -232,8 +232,9 @@ describe('the artifacts that actually ship', () => {
   }, 90_000);
 
   it('reaches the confirmation screen on the recorded write capability', async () => {
+    // Pinned. An unversioned id resolves to the newest version, and 1.1.0 posts.
     const r = await replay({
-      capability: shipped('memberlink.open-sub-account'),
+      capability: shipped('memberlink.open-sub-account@1.0.0'),
       inputs: { memberId: '123456', accountType: 'VACATION CLUB', openingDeposit: 250 },
       env: env(),
       evidenceRoot,
@@ -243,8 +244,29 @@ describe('the artifacts that actually ship', () => {
     expect(r.outputs.reference).toBe('SA-123456');
   }, 90_000);
 
+  it('refuses the irreversible post when no escalation channel is configured', async () => {
+    // Nobody to ask means the step does not happen. Acting because no human was
+    // reachable is the one outcome that must never be possible for a step that
+    // moves money.
+    const r = await replay({
+      capability: shipped('memberlink.open-sub-account@1.1.0'),
+      inputs: { memberId: '345678', accountType: 'CERTIFICATE', openingDeposit: 100 },
+      env: env(),
+      evidenceRoot,
+    });
+    expect(r.status).toBe('failure');
+    if (r.status !== 'failure') return;
+    expect(r.error.category).toBe('policy_denied');
+    expect(r.error.stepId).toBe('s13-click');
+    expect(r.error.retryable).toBe(false);
+  }, 120_000);
+
   it('every shipped artifact is approved and carries proof on each write step', () => {
-    for (const id of ['memberlink.lookup-member-balance', 'memberlink.open-sub-account']) {
+    for (const id of [
+      'memberlink.lookup-member-balance',
+      'memberlink.open-sub-account@1.0.0',
+      'memberlink.open-sub-account@1.1.0',
+    ]) {
       const cap = store.load(id);
       expect(cap.state).toBe('approved');
       for (const step of cap.steps) {
@@ -252,6 +274,117 @@ describe('the artifacts that actually ship', () => {
       }
     }
   });
+});
+
+describe('the irreversible write — gated, performed, and not performed twice', () => {
+  const store = new CapabilityStore(join(__dirname, '..', 'capabilities'));
+
+  function posting() {
+    const cap = store.load('memberlink.open-sub-account@1.1.0');
+    cap.policy = { ...cap.policy, allowedOrigins: [`${BASE}/t/summit`] };
+    return cap;
+  }
+
+  async function accountsOf(memberId: string): Promise<string[]> {
+    const signon = await fetch(`${BASE}/t/summit/signon`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'opid=OPR001&pw=training-only',
+      redirect: 'manual',
+    });
+    const cookie = signon.headers.get('set-cookie')?.split(';')[0] ?? '';
+    const html = await (await fetch(`${BASE}/t/summit/member/${memberId}`, { headers: { cookie } })).text();
+    return [...html.matchAll(/<td>\d{4}<\/td><td>([A-Z ]+)<\/td>/g)].map((m) => m[1] as string);
+  }
+
+  async function runIt() {
+    const broker = new EscalationBroker(evidenceRoot, new Redactor('t'));
+    // Not 4190: that is on the WHATWG blocked-ports list ("sieve"), and Node's
+    // fetch refuses it with "bad port", so the scripted operator would poll a
+    // console it can never reach.
+    const consoleSrv = new OperatorConsole(broker, 4191);
+    await consoleSrv.start();
+    // The supervisor waits for a ticket that may never come, so the run's end
+    // is what stops it — exactly as the CLI does it.
+    const done = new AbortController();
+    const operator = runAutoOperator({
+      consoleBaseUrl: consoleSrv.baseUrl,
+      // The supervisor authorises; they do not press the button themselves, so
+      // the engine still has to see the posted screen before calling it done.
+      playbooks: [{ when: 'confirm and post', disposition: 'resume', notes: 'authorised' }],
+      timeoutMs: 120_000,
+      signal: done.signal,
+    });
+    const r = await replay({
+      capability: posting(),
+      inputs: { memberId: '123456', accountType: 'VACATION CLUB', openingDeposit: 250 },
+      env: env(),
+      evidenceRoot,
+      escalation: { broker, consoleBaseUrl: consoleSrv.baseUrl, timeoutMs: 45_000 },
+    });
+    done.abort();
+    await operator;
+    await consoleSrv.stop();
+    return r;
+  }
+
+  it('requires a human decision for the post, then actually opens the account', async () => {
+    await fetch(`${BASE}/t/summit/__reset`);
+    const before = await accountsOf('123456');
+
+    const r = await runIt();
+
+    expect(r.status).toBe('success');
+    expect(r.escalations).toHaveLength(1);
+    expect(r.escalations[0]!.reason).toBe('confirmation_required');
+    expect(r.escalations[0]!.disposition).toBe('resume');
+
+    // The account exists afterwards. Without this the capability could "succeed"
+    // against a confirmation screen that opens nothing, which is what it did
+    // before this version.
+    const after = await accountsOf('123456');
+    expect(after).toHaveLength(before.length + 1);
+    expect(after).toContain('VACATION CLUB');
+  }, 180_000);
+
+  it('reports SUB_ACCOUNT_EXISTS on a re-run instead of posting a second one', async () => {
+    // The state left by the previous test is the point: this is the caller
+    // retrying an operation that already landed.
+    const before = await accountsOf('123456');
+    expect(before).toContain('VACATION CLUB');
+
+    const r = await runIt();
+
+    expect(r.status).toBe('business_outcome');
+    if (r.status !== 'business_outcome') return;
+    expect(r.outcome.code).toBe('SUB_ACCOUNT_EXISTS');
+    // No human was troubled, because nothing needed deciding.
+    expect(r.escalations).toEqual([]);
+
+    const after = await accountsOf('123456');
+    expect(after).toEqual(before);
+  }, 180_000);
+
+  it('the target application does not deduplicate — the guard is doing the work', async () => {
+    // If the app quietly swallowed a duplicate post, the test above would pass
+    // with the guard deleted, and the guarantee would be fictional.
+    const before = await accountsOf('123456');
+    const signon = await fetch(`${BASE}/t/summit/signon`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'opid=OPR001&pw=training-only',
+      redirect: 'manual',
+    });
+    const cookie = signon.headers.get('set-cookie')?.split(';')[0] ?? '';
+    await fetch(`${BASE}/t/summit/member/123456/commit`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', cookie },
+      body: 'acct_type=VACATION+CLUB&deposit=250',
+    });
+    const after = await accountsOf('123456');
+    expect(after).toHaveLength(before.length + 1);
+    await fetch(`${BASE}/t/summit/__reset`);
+  }, 60_000);
 });
 
 describe('escalation — control transfer over the real operator API', () => {
@@ -264,12 +397,14 @@ describe('escalation — control transfer over the real operator API', () => {
     const cap = fixture();
     cap.steps[6]!.checkpoint = { kind: 'textPresent', value: 'Underwriting Queue', match: 'contains', framePath: ['mainFrame'] };
 
+    const done = new AbortController();
     const operator = runAutoOperator({
       consoleBaseUrl: consoleSrv.baseUrl,
       // No playbook matches, so the scripted supervisor aborts — which is the
       // correct behaviour for an operator who does not recognise the screen.
       playbooks: [{ when: 'member detail', click: [], disposition: 'abort', notes: 'nothing to do here' }],
       timeoutMs: 60_000,
+      signal: done.signal,
     });
 
     const r = await replay({
@@ -280,6 +415,7 @@ describe('escalation — control transfer over the real operator API', () => {
       escalation: { broker, consoleBaseUrl: consoleSrv.baseUrl, timeoutMs: 45_000 },
     });
 
+    done.abort();
     await operator;
     await consoleSrv.stop();
 

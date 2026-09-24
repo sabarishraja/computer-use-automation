@@ -200,6 +200,15 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
 
   const render = (tmpl: string): string => renderTemplate(tmpl, { inputs, outputs, env });
 
+  /**
+   * Conditions are otherwise static by design — a checkpoint containing a value
+   * from one run would only ever hold for that run. An idempotency guard is the
+   * exception: "already has a {{inputs.accountType}} account" is a question
+   * about the caller's request, so its text is rendered.
+   */
+  const renderCondition = (c: Condition): Condition =>
+    c.kind === 'textPresent' || c.kind === 'textAbsent' ? { ...c, value: render(c.value) } : c;
+
   const captureFailureEvidence = async (label: string) => {
     const shot = await surface.screenshot(logger.shotPath(label));
     const snap = await surface.snapshot(logger.snapPath(label));
@@ -512,6 +521,41 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
           });
         }
         if (res.disposition === 'resume_step_done') stepAlreadyDone = true;
+      }
+
+      /* -- idempotency: has this write already been applied? -- */
+      if (step.idempotency && !stepAlreadyDone) {
+        // Evaluated on the screen BEFORE the step acts, with the caller's own
+        // values rendered in, so "does this member already have a VACATION
+        // CLUB account" is a question about this call and not about the
+        // recording. A held guard is not a failure: the work exists, and
+        // saying so is a business answer.
+        const guard = renderCondition(step.idempotency.guard);
+        const key = render(step.idempotency.key);
+        const already = await surface.evaluate(guard, 0);
+        logger.log({
+          type: 'idempotency',
+          stepId: step.id,
+          key,
+          alreadyApplied: already.held,
+          detail: already.detail,
+        });
+        if (already.held) {
+          const declared = cap.outcomes.find((o) => o.code === step.idempotency?.outcome);
+          if (declared) {
+            return finishWithOutcome({
+              code: declared.code,
+              message: render(declared.message),
+              partialOutputs: declared.partialOutputs,
+            });
+          }
+          // Declared outcome missing is a validation error, not something to
+          // paper over by writing twice.
+          return await fail('internal', {
+            message: `step "${step.id}" idempotency names outcome "${step.idempotency.outcome}", which the capability does not declare`,
+            stepId: step.id,
+          });
+        }
       }
 
       /* -- precondition -- */

@@ -23,6 +23,8 @@ Servicing**, a deliberately hostile legacy web app (`target-app/`).
   `harbor` (v3.4.2, "Customer", "Find", plus a disclosure interstitial)
 - switchable runtime faults: slow response, surprise maintenance notice, session expiry, HTTP 500
 - a supervisor-override gate that the automation cannot satisfy on its own
+- posting a sub-account really posts it: the member's accounts change, and posting twice appends
+  two rows, so a double-post is visible rather than quietly absorbed
 - synthetic data only; the one credential it accepts is fake and non-secret
 
 Everything is at `http://127.0.0.1:4173`.
@@ -158,6 +160,38 @@ npm run replay -- --capability memberlink.open-sub-account --operator console --
 
 Take control, act on the live screen by control name, and release with **resume**,
 **mark step done**, or **abort**.
+
+**7b. The irreversible post — the write that actually writes.** `@1.1.0` of the same capability
+appends a human-authored `Confirm and Post` step. It exceeds the capability's unattended risk
+ceiling, so replay stops and asks a person; the scripted supervisor authorises, and the
+automation — not the human — performs the step, so the checkpoint still has to see the posted
+screen:
+
+```bash
+npm run target        # keep ONE app running: posted accounts live in it
+npm run replay -- --capability memberlink.open-sub-account@1.1.0   --param memberId=123456 --param accountType="VACATION CLUB" --param openingDeposit=250
+```
+
+```json
+{ "status": "success", "outputs": { "reference": "SA-123456" },
+  "escalations": [{ "reason": "confirmation_required", "disposition": "resume" }] }
+```
+
+The account now exists on the member's detail screen. Run the identical command again — a caller
+retrying after an ambiguous failure:
+
+```json
+{ "status": "business_outcome",
+  "outcome": { "code": "SUB_ACCOUNT_EXISTS",
+               "message": "Member 123456 already holds a VACATION CLUB account; nothing was opened." } }
+```
+
+No second account, and no human was troubled, because nothing needed deciding. The artifact
+declares an idempotency guard; the application itself does **not** deduplicate, and a test proves
+a forced double-post appends a second row. With `--param openingDeposit=5000` the same run needs a
+supervisor twice — once for the branch-limit override, once for the post.
+
+`@1.0.0` still stops at the confirmation screen. Both versions are listed by `npm run catalog`.
 
 **8. Cross-tenant reuse.** Apply a tenant overlay and run the *same artifact* against a second
 institution on the same vendor product:
