@@ -92,6 +92,10 @@ export class Redactor {
 
   private walk(v: unknown): unknown {
     if (typeof v === 'string') return this.text(v);
+    if (typeof v === 'number') {
+      const scrubbed = this.text(String(v));
+      return scrubbed === String(v) ? v : scrubbed;
+    }
     if (Array.isArray(v)) return v.map((x) => this.walk(x));
     if (v && typeof v === 'object') {
       const out: Record<string, unknown> = {};

@@ -1,0 +1,30 @@
+{
+  "runId": "replay-2026-09-29T15-30-11-639Z-5727f0f0",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "startedAt": "2026-09-29T15:30:11.639Z",
+  "durationMs": 30574,
+  "stepsAttempted": 7,
+  "stepsTotal": 9,
+  "recoveries": [],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-29T15-30-11-639Z-5727f0f0",
+  "status": "failure",
+  "error": {
+    "message": "step \"s07-click\" (Search for the member) did not reach its expected state",
+    "stepId": "s07-click",
+    "stepIntent": "Search for the member",
+    "stepIndex": 7,
+    "expected": "page text contains \"Member Detail\"",
+    "observed": "text \"Member Detail\" absent",
+    "category": "app_error",
+    "retryable": true,
+    "url": "http://127.0.0.1:4173/t/summit/",
+    "evidence": {
+      "logPath": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-29T15-30-11-639Z-5727f0f0\\run.jsonl",
+      "screenshotPath": "evidence\\runs\\replay-2026-09-29T15-30-11-639Z-5727f0f0\\030-app-error-s07-click.png",
+      "snapshotPath": "evidence\\runs\\replay-2026-09-29T15-30-11-639Z-5727f0f0\\030-app-error-s07-click.html"
+    }
+  }
+}

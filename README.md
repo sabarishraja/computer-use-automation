@@ -7,8 +7,10 @@ a calling agent the difference between "the balance is $4,820.15", "no such memb
 automation is broken" — and pulling a human into the *same live session* when it cannot safely
 proceed.
 
-The design write-up, including every trade-off and what was deliberately cut, is in
-**[REPORT.md](./REPORT.md)**.
+The requested short design write-up is in **[REPORT.md](./REPORT.md)**. Extended reasoning
+and adversarial test notes are in [docs/DESIGN_NOTES.md](./docs/DESIGN_NOTES.md).
+The [evidence map](./evidence/README.md) links the recorded artifact to the most useful runs.
+The [submission audit](./docs/SUBMISSION_AUDIT.md) maps the brief to implementation and evidence.
 
 ---
 
@@ -34,10 +36,15 @@ Everything is at `http://127.0.0.1:4173`.
 ## Setup
 
 ```bash
-npm install
+npm ci
 npx playwright install chromium
-cp .env.example .env         # then set ANTHROPIC_API_KEY for the discovery step
+cp .env.example .env         # bash; then set ANTHROPIC_API_KEY for discovery
 ```
+
+On Windows PowerShell, use `Copy-Item .env.example .env` in place of `cp`.
+The code and commands run the same way in Codex or another coding assistant;
+`AGENTS.md` provides project guidance for Codex. The discovery implementation
+uses the Anthropic API regardless of which assistant is editing this repository.
 
 `.env`:
 
@@ -259,7 +266,7 @@ docs/capability.schema.json   generated JSON Schema for the artifact
 that returns a list to disambiguate → a loud `checkpoint_failed`), `renamedfield` (a form control
 renamed by a version bump → survives, because the label strategy is preferred) and `confirmdialog`
 (a native `confirm()` in front of a write → a failure that quotes the dialog and names the fix).
-REPORT.md explains what each one found. `--escalation-timeout <ms>` shortens the wait for a human
+[docs/DESIGN_NOTES.md](./docs/DESIGN_NOTES.md) explains what each one found. `--escalation-timeout <ms>` shortens the wait for a human
 so an unanswered escalation can be demonstrated in seconds rather than fifteen minutes.
 
 `--chaos` and `--operator` reject an unrecognised value rather than accepting it silently.
@@ -270,9 +277,12 @@ Exit codes: `0` success · `3` business outcome · `1` failure · `2` usage.
 
 ## Evidence
 
-`evidence/` contains a recorded artifact plus logs from a real discovery run and from several
+`evidence/` contains an [example artifact](./evidence/memberlink.lookup-member-balance@1.0.0.json)
+plus logs from a real discovery run and from several
 replay runs — success, a business outcome, a recovered interstitial, a hard failure, and an
 escalation with human handoff.
+
+Start at [evidence/README.md](./evidence/README.md) for exact links to the canonical runs.
 
 Declared values — inputs, credentials, and any value bound to a declared output — are registered
 with the redactor before the first log line and scrubbed on the way to disk. Replay evidence is

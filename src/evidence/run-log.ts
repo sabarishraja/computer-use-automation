@@ -20,9 +20,9 @@ import type { Redactor } from '../policy/redaction.js';
  * post-mortem and a diff in a pull request, not a log aggregator. Every event
  * carries the step id, so "what did step 4 actually see" is one grep.
  *
- * Redaction happens at write time, not read time. There is no path by which an
- * unredacted value reaches disk, which is the only version of this property
- * that survives contact with a codebase that keeps growing.
+ * Structured text is redacted at write time, not read time. Screenshots and
+ * incidental page content still need restricted storage in a real deployment;
+ * the committed evidence uses only synthetic data.
  */
 
 export type RunKind = 'discovery' | 'replay';

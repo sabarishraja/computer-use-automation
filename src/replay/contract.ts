@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import type { InputParam } from '../artifact/schema.js';
+import type { InputParam, RiskClass } from '../artifact/schema.js';
+import type { EscalationDisposition } from '../escalation/types.js';
 
 /**
  * ============================================================================
@@ -82,7 +83,7 @@ export const RETRYABLE: Record<FailureCategory, boolean> = {
   input_validation: false,
   policy_denied: false,
   locator_unresolved: false,
-  action_failed: true,
+  action_failed: false,
   precondition_failed: false,
   checkpoint_failed: false,
   success_condition_failed: false,
@@ -94,6 +95,16 @@ export const RETRYABLE: Record<FailureCategory, boolean> = {
   configuration: false,
   internal: false,
 };
+
+/** A write may have landed even when its response or checkpoint was lost. */
+export function retryableFor(category: FailureCategory, stepRisk?: RiskClass): boolean {
+  return RETRYABLE[category] && (stepRisk === undefined || stepRisk === 'read');
+}
+
+/** A resumed handoff can repeat a read, but an uncertain write must only be verified. */
+export function mayReissueAfterHandoff(risk: RiskClass, disposition: EscalationDisposition): boolean {
+  return risk === 'read' && disposition === 'resume';
+}
 
 export type FailureDetail = {
   category: FailureCategory;

@@ -1,0 +1,631 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "memberlink.lookup-member-balance",
+  "version": "1.0.0",
+  "name": "Look up a member's share savings balance",
+  "description": "Given a 6-digit member number, open the member's record in MemberLink Core Servicing and return their name and current SHARE SAVINGS balance. Read-only: this capability never changes a record.",
+  "state": "approved",
+  "surface": {
+    "kind": "web",
+    "entry": "{{env.baseUrl}}/t/summit/",
+    "application": {
+      "vendor": "memberlink",
+      "product": "core-servicing",
+      "versionRange": "3.x"
+    },
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    }
+  },
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "description": "The member's 6-digit account number.",
+      "required": true,
+      "sensitivity": "identifier",
+      "pattern": "^\\d{6}$",
+      "example": "123456"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "memberName",
+      "type": "string",
+      "description": "The member's name as shown on the detail screen, in LAST, FIRST form.",
+      "sensitivity": "pii",
+      "required": true
+    },
+    {
+      "name": "savingsBalance",
+      "type": "money",
+      "description": "Current balance of the member's SHARE SAVINGS account, in USD.",
+      "sensitivity": "financial",
+      "required": true
+    }
+  ],
+  "steps": [
+    {
+      "id": "s01-navigate",
+      "intent": "Open {{env.baseUrl}}/t/summit/",
+      "action": {
+        "type": "navigate",
+        "url": "{{env.baseUrl}}/t/summit/"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 20000,
+      "optional": false
+    },
+    {
+      "id": "s02-fill",
+      "intent": "Enter operator ID",
+      "action": {
+        "type": "fill",
+        "target": {
+          "description": "Operator ID",
+          "framePath": [],
+          "strategies": [
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Operator ID:",
+              "anchorMatch": "exact",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Operator ID",
+              "anchorMatch": "contains",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "fieldName",
+              "name": "opid"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Operator ID:",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[1]/td[2]/input"
+            }
+          ]
+        },
+        "value": "{{env.secret_OPERATOR_ID}}"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s03-fill",
+      "intent": "Enter operator password",
+      "action": {
+        "type": "fill",
+        "target": {
+          "description": "Password",
+          "framePath": [],
+          "strategies": [
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Password:",
+              "anchorMatch": "exact",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Password",
+              "anchorMatch": "contains",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "fieldName",
+              "name": "pw"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Password:",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[2]/td[2]/input"
+            }
+          ]
+        },
+        "value": "{{env.secret_OPERATOR_PASSWORD}}"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s04-click",
+      "intent": "Submit sign-on form",
+      "action": {
+        "type": "click",
+        "target": {
+          "description": "Sign On",
+          "framePath": [],
+          "strategies": [
+            {
+              "tier": "semantic",
+              "kind": "role",
+              "role": "button",
+              "name": "Sign On",
+              "match": "exact"
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[3]/td[2]/input"
+            }
+          ]
+        }
+      },
+      "risk": "read",
+      "checkpoint": {
+        "kind": "textPresent",
+        "value": "Welcome, operator",
+        "match": "contains"
+      },
+      "recovery": [],
+      "timeoutMs": 15000,
+      "optional": false
+    },
+    {
+      "id": "s05-click",
+      "intent": "Navigate to Member Search",
+      "action": {
+        "type": "click",
+        "target": {
+          "description": "Member Search",
+          "framePath": [
+            "navFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "semantic",
+              "kind": "role",
+              "role": "link",
+              "name": "Member Search",
+              "match": "exact"
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/table/tbody/tr[2]/td/a"
+            }
+          ]
+        }
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 15000,
+      "optional": false
+    },
+    {
+      "id": "s06-fill",
+      "intent": "Enter member number to search",
+      "action": {
+        "type": "fill",
+        "target": {
+          "description": "Member Number",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Member Number:",
+              "anchorMatch": "exact",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Member Number",
+              "anchorMatch": "contains",
+              "direction": "following",
+              "control": "textbox",
+              "ordinal": 1
+            },
+            {
+              "tier": "structural",
+              "kind": "fieldName",
+              "name": "mbr_no"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Member Number:",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[1]/td[2]/input"
+            }
+          ]
+        },
+        "value": "{{inputs.memberId}}"
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s07-click",
+      "intent": "Search for the member",
+      "action": {
+        "type": "click",
+        "target": {
+          "description": "Search",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "semantic",
+              "kind": "role",
+              "role": "button",
+              "name": "Search",
+              "match": "exact"
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/form/table/tbody/tr[3]/td[2]/input[1]"
+            }
+          ]
+        }
+      },
+      "risk": "read",
+      "checkpoint": {
+        "kind": "textPresent",
+        "value": "Member Detail",
+        "match": "contains"
+      },
+      "recovery": [],
+      "timeoutMs": 15000,
+      "optional": false
+    },
+    {
+      "id": "s08-extract",
+      "intent": "Extract member's name from detail screen",
+      "action": {
+        "type": "extract",
+        "target": {
+          "description": "Name",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "structural",
+              "kind": "nearText",
+              "anchor": "Name:",
+              "anchorMatch": "exact",
+              "direction": "following",
+              "control": "cell",
+              "ordinal": 1
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "Member Since:",
+              "column": 1
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/table[1]/tbody/tr[2]/td[2]"
+            }
+          ]
+        },
+        "field": "memberName",
+        "transform": {
+          "kind": "trim"
+        }
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    },
+    {
+      "id": "s09-extract",
+      "intent": "Extract SHARE SAVINGS current balance",
+      "action": {
+        "type": "extract",
+        "target": {
+          "description": "cell control",
+          "framePath": [
+            "mainFrame"
+          ],
+          "strategies": [
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "SHARE SAVINGS",
+              "column": "Current Balance"
+            },
+            {
+              "tier": "positional",
+              "kind": "tableCell",
+              "rowContains": "SHARE SAVINGS",
+              "column": 3
+            },
+            {
+              "tier": "fragile",
+              "kind": "xpath",
+              "expression": "/html/body/table[2]/tbody/tr[2]/td[4]"
+            }
+          ]
+        },
+        "field": "savingsBalance",
+        "transform": {
+          "kind": "money"
+        }
+      },
+      "risk": "read",
+      "recovery": [],
+      "timeoutMs": 10000,
+      "optional": false
+    }
+  ],
+  "outcomes": [
+    {
+      "code": "MEMBER_NOT_FOUND",
+      "description": "The member number is well-formed but no such member exists at this institution.",
+      "when": {
+        "kind": "textPresent",
+        "value": "No member record found",
+        "match": "contains",
+        "framePath": [
+          "mainFrame"
+        ]
+      },
+      "message": "No member record exists for {{inputs.memberId}}.",
+      "partialOutputs": []
+    },
+    {
+      "code": "MEMBER_RESTRICTED",
+      "description": "The member record exists but this operator is not authorised to view it.",
+      "when": {
+        "kind": "textPresent",
+        "value": "is not authorized to view this member record.",
+        "match": "contains"
+      },
+      "message": "Access to member {{inputs.memberId}} is restricted for this operator.",
+      "partialOutputs": []
+    }
+  ],
+  "globalRecovery": [
+    {
+      "id": "dismiss-maintenance-notice",
+      "description": "Clear the scheduled-maintenance interstitial that the app can interpose on any screen.",
+      "when": {
+        "kind": "textPresent",
+        "value": "Scheduled maintenance",
+        "match": "contains"
+      },
+      "do": [
+        {
+          "type": "click",
+          "target": {
+            "description": "Continue button on the maintenance notice",
+            "framePath": [
+              "*"
+            ],
+            "strategies": [
+              {
+                "tier": "semantic",
+                "kind": "role",
+                "role": "button",
+                "name": "Continue",
+                "match": "exact"
+              }
+            ]
+          }
+        }
+      ],
+      "maxAttempts": 2,
+      "scope": "global"
+    },
+    {
+      "id": "acknowledge-disclosure",
+      "description": "Acknowledge the monitoring disclosure some institutions interpose after sign-on.",
+      "when": {
+        "kind": "textPresent",
+        "value": "Activity in this system is monitored",
+        "match": "contains"
+      },
+      "do": [
+        {
+          "type": "click",
+          "target": {
+            "description": "Acknowledge button on the disclosure screen",
+            "framePath": [
+              "*"
+            ],
+            "strategies": [
+              {
+                "tier": "semantic",
+                "kind": "role",
+                "role": "button",
+                "name": "Acknowledge",
+                "match": "exact"
+              }
+            ]
+          }
+        }
+      ],
+      "maxAttempts": 2,
+      "scope": "global"
+    },
+    {
+      "id": "re-authenticate",
+      "description": "Sign on again after the application expires the session mid-run.",
+      "when": {
+        "kind": "textPresent",
+        "value": "Your session has expired",
+        "match": "contains"
+      },
+      "do": [
+        {
+          "type": "fill",
+          "target": {
+            "description": "Operator ID field on the sign-on screen",
+            "framePath": [
+              "*"
+            ],
+            "strategies": [
+              {
+                "tier": "structural",
+                "kind": "nearText",
+                "anchor": "Operator ID:",
+                "anchorMatch": "exact",
+                "direction": "following",
+                "control": "textbox",
+                "ordinal": 1
+              },
+              {
+                "tier": "structural",
+                "kind": "fieldName",
+                "name": "opid"
+              }
+            ]
+          },
+          "value": "{{env.secret_OPERATOR_ID}}"
+        },
+        {
+          "type": "fill",
+          "target": {
+            "description": "Password field on the sign-on screen",
+            "framePath": [
+              "*"
+            ],
+            "strategies": [
+              {
+                "tier": "structural",
+                "kind": "nearText",
+                "anchor": "Password:",
+                "anchorMatch": "exact",
+                "direction": "following",
+                "control": "textbox",
+                "ordinal": 1
+              },
+              {
+                "tier": "structural",
+                "kind": "fieldName",
+                "name": "pw"
+              }
+            ]
+          },
+          "value": "{{env.secret_OPERATOR_PASSWORD}}"
+        },
+        {
+          "type": "click",
+          "target": {
+            "description": "Sign On button",
+            "framePath": [
+              "*"
+            ],
+            "strategies": [
+              {
+                "tier": "semantic",
+                "kind": "role",
+                "role": "button",
+                "name": "Sign On",
+                "match": "exact"
+              }
+            ]
+          }
+        }
+      ],
+      "maxAttempts": 1,
+      "scope": "global"
+    }
+  ],
+  "successCondition": {
+    "kind": "textPresent",
+    "value": "Member Detail",
+    "match": "contains"
+  },
+  "policy": {
+    "allowedOrigins": [
+      "http://127.0.0.1:4173/t/summit"
+    ],
+    "allowedPathPrefixes": [],
+    "maxUnattendedRisk": "read",
+    "neverPersist": [
+      "memberName",
+      "savingsBalance"
+    ],
+    "requiresApprovalState": [
+      "approved"
+    ]
+  },
+  "provenance": {
+    "recordedAt": "2026-09-23T17:10:11.259Z",
+    "recordedBy": "llm-discovery",
+    "goal": "Sign on as the operator, look up member {{inputs.memberId}}, open their record, and read their name and their SHARE SAVINGS account balance.",
+    "model": "claude-sonnet-5",
+    "discoveryRunId": "discovery-2026-09-23T17-08-35-658Z-7d00838a",
+    "transcriptDigest": "e280021a9de64c290da3d1cd245b8ef0d045675895044ab7ac90283b2de1648c",
+    "humanEditedSteps": []
+  },
+  "tenantOverlays": [
+    {
+      "tenantId": "harbor",
+      "institution": "Harbor First Bank",
+      "terms": {
+        "Member Search": "Customer Search",
+        "Member Detail": "Customer Detail",
+        "Member Number": "Customer Number",
+        "Current Balance": "Available Balance",
+        "New Search": "New Find",
+        "Member": "Customer",
+        "member": "customer",
+        "Search": "Find"
+      },
+      "entry": "{{env.baseUrl}}/t/harbor/",
+      "productVersion": "3.4.2",
+      "allowedOrigins": [
+        "http://127.0.0.1:4173/t/harbor"
+      ],
+      "locatorOverrides": {},
+      "extraRecovery": [],
+      "extraOutcomes": [],
+      "notes": "Harbor First Bank runs MemberLink 3.4.2 against the same screens as Summit's 3.1.7, configured with 'Customer' terminology and a 'Find' action label, and with the monitoring disclosure enabled after sign-on. The whole divergence is vocabulary plus one interstitial, so the overlay is a term map rather than a fork: no step is added, removed or reordered. The disclosure is already covered by the app profile's global recovery rules."
+    }
+  ]
+}

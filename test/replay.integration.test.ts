@@ -130,6 +130,10 @@ describe('replay — hard failures', () => {
     expect(r.error.observed).toBeTruthy();
     expect(r.error.evidence.screenshotPath).toBeTruthy();
     expect(r.error.evidence.snapshotPath).toBeTruthy();
+    const persisted = JSON.parse(readFileSync(join(r.evidenceDir, 'result.json'), 'utf8'));
+    expect(persisted.status).toBe('failure');
+    expect(persisted.error.category).toBe('app_error');
+    expect(persisted.error.stepId).toBe('s07-click');
   }, 90_000);
 
   it('rejects malformed input without opening a browser', async () => {
@@ -140,6 +144,26 @@ describe('replay — hard failures', () => {
     expect(r.error.category).toBe('input_validation');
     expect(r.error.retryable).toBe(false);
     expect(Date.now() - t0).toBeLessThan(3000);
+    const persisted = JSON.parse(readFileSync(join(r.evidenceDir, 'result.json'), 'utf8'));
+    expect(persisted.status).toBe('failure');
+    expect(persisted.error.category).toBe('input_validation');
+  }, 30_000);
+
+  it('redacts numeric sensitive API inputs even on a preflight failure', async () => {
+    const cap = fixture();
+    cap.inputs.push({ name: 'openingDeposit', type: 'money', description: 'Synthetic test amount', required: true, sensitivity: 'financial' });
+    const r = await replay({
+      capability: cap,
+      inputs: { memberId: 'not-a-number', openingDeposit: 4820.15 },
+      env: env(),
+      evidenceRoot,
+    });
+    expect(r.status).toBe('failure');
+    const log = readFileSync(join(r.evidenceDir, 'run.jsonl'), 'utf8');
+    const persisted = readFileSync(join(r.evidenceDir, 'result.json'), 'utf8');
+    expect(log).toContain('[redacted:financial]');
+    expect(log).not.toContain('4820.15');
+    expect(persisted).not.toContain('4820.15');
   }, 30_000);
 
   it('refuses to replay a draft capability unattended', async () => {

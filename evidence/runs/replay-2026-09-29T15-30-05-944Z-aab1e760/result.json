@@ -1,0 +1,24 @@
+{
+  "runId": "replay-2026-09-29T15-30-05-944Z-aab1e760",
+  "capabilityId": "memberlink.lookup-member-balance",
+  "capabilityVersion": "1.0.0",
+  "startedAt": "2026-09-29T15:30:05.943Z",
+  "durationMs": 2,
+  "stepsAttempted": 0,
+  "stepsTotal": 9,
+  "recoveries": [],
+  "escalations": [],
+  "drift": [],
+  "evidenceDir": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-29T15-30-05-944Z-aab1e760",
+  "status": "failure",
+  "error": {
+    "message": "inputs rejected by the capability contract: memberId: must match ^\\d{6}$",
+    "expected": "memberId:string",
+    "observed": "[\"memberId\"]",
+    "category": "input_validation",
+    "retryable": false,
+    "evidence": {
+      "logPath": "C:\\Users\\sabar\\Downloads\\computer-use-automation\\evidence\\runs\\replay-2026-09-29T15-30-05-944Z-aab1e760\\run.jsonl"
+    }
+  }
+}

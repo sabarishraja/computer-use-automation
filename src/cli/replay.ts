@@ -126,7 +126,9 @@ async function main(): Promise<void> {
 
   console.log(`[replay] capability ${capability.id}@${capability.version} (${capability.state})`);
   console.log(`[replay] tenant     ${tenant ?? '(base)'}`);
-  console.log(`[replay] inputs     ${JSON.stringify(args.params)}`);
+  // Shell and CI logs are durable too. The capability contract validates the
+  // values later; this diagnostic only needs the supplied parameter names.
+  console.log(`[replay] inputs     ${Object.keys(args.params).join(', ') || '(none)'}`);
   if (escalationEnabled) console.log(`[replay] operator   ${operatorConsole.baseUrl} (${operatorMode})`);
 
   const credentialKeys = ['OPERATOR_ID', 'OPERATOR_PASSWORD'];

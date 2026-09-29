@@ -22,13 +22,14 @@ import type { EscalationReason, Resolution } from '../escalation/types.js';
 import {
   coerceOutput,
   inputSchema,
-  RETRYABLE,
+  mayReissueAfterHandoff,
   type DriftRecord,
   type EscalationRecord,
   type FailureCategory,
   type FailureDetail,
   type RecoveryRecord,
   type ReplayResult,
+  retryableFor,
 } from './contract.js';
 
 export type ReplayOptions = {
@@ -108,16 +109,18 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
 
   const failNow = (category: FailureCategory, detail: Omit<FailureDetail, 'category' | 'retryable' | 'evidence'>): ReplayResult => {
     logger.log({ type: 'run.end', status: 'failure:' + category, ms: Date.now() - t0, error: detail.message });
-    return {
+    const result: ReplayResult = {
       ...common(),
       status: 'failure',
       error: {
         ...detail,
         category,
-        retryable: RETRYABLE[category],
+        retryable: retryableFor(category),
         evidence: { logPath: logger.path('run.jsonl') },
       },
     };
+    logger.writeResult(result);
+    return result;
   };
 
   /* ---------------------- pre-flight, before any browser ------------------ */
@@ -225,17 +228,19 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   ): Promise<ReplayResult> => {
     const ev = await captureFailureEvidence(`${category}-${detail.stepId ?? 'run'}`);
     logger.log({ type: 'run.end', status: 'failure:' + category, ms: Date.now() - t0, error: detail.message });
-    return {
+    const result: ReplayResult = {
       ...common(),
       status: 'failure',
       error: {
         ...detail,
         category,
-        retryable: RETRYABLE[category],
+        retryable: retryableFor(category, cap.steps.find((step) => step.id === detail.stepId)?.risk),
         url: detail.url ?? (await surface.currentUrl()),
         evidence: { logPath: logger.path('run.jsonl'), ...ev },
       },
     };
+    logger.writeResult(result);
+    return result;
   };
 
   /** Check every declared business outcome. First match wins and ends the run. */
@@ -622,7 +627,13 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
           if (outcome) return finishWithOutcome(outcome);
 
           if (await tryRecover(step)) {
-            result = await runAction(step, step.action, step.timeoutMs);
+            if (step.risk === 'read') {
+              result = await runAction(step, step.action, step.timeoutMs);
+            } else if (step.checkpoint && (await surface.evaluate(step.checkpoint, 0)).held) {
+              // A write may have landed despite an action error. Verify it,
+              // but never issue it again automatically after recovery.
+              result = { ok: true };
+            }
           }
         }
 
@@ -637,7 +648,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
           const res = await escalate(
             isLocator ? 'locator_unresolved' : 'unknown_state',
             `Step ${index + 1}/${cap.steps.length} "${step.intent}" could not be performed. ${result.error}`,
-            `Bring the application to the state this step expects (${describe(step.checkpoint ?? { kind: 'textPresent', value: '?' })}), then release with "mark step done"; or release with "resume" to let the automation retry; or abort.`,
+            `Bring the application to the state this step expects (${describe(step.checkpoint ?? { kind: 'textPresent', value: '?' })}), then release with "mark step done"; "resume" ${step.risk === 'read' ? 'retries the read' : 'only rechecks the state and will never repeat this write'}; or abort.`,
             step,
             index,
           );
@@ -659,7 +670,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
               stepIndex: index + 1,
             });
           }
-          if (res.disposition === 'resume') {
+          if (mayReissueAfterHandoff(step.risk, res.disposition)) {
             result = await runAction(step, step.action, step.timeoutMs);
             if (!result.ok && !step.optional) {
               return await fail('action_failed', {
@@ -667,6 +678,18 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
                 stepId: step.id,
                 stepIntent: step.intent,
                 stepIndex: index + 1,
+              });
+            }
+          } else if (res.disposition === 'resume' && step.risk !== 'read') {
+            const verified = step.checkpoint && (await surface.evaluate(step.checkpoint, 0)).held;
+            if (!verified) {
+              return await fail('action_failed', {
+                message: `step "${step.id}" may have written data; operator resume did not verify its checkpoint, so the write was not repeated`,
+                stepId: step.id,
+                stepIntent: step.intent,
+                stepIndex: index + 1,
+                expected: step.checkpoint ? describe(step.checkpoint) : 'a declared checkpoint for the write',
+                observed: result.error,
               });
             }
           }
@@ -720,7 +743,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
             'unknown_state',
             `Step ${index + 1}/${cap.steps.length} "${step.intent}" ran, but the expected state did not appear.\n` +
               `Expected: ${describe(step.checkpoint)}\nObserved: ${cp.detail}`,
-            `Look at the screen. If the application is asking for something the automation cannot supply, do it yourself and release with "mark step done". Otherwise release with "resume" to retry the step, or abort.`,
+            `Look at the screen. If the application is asking for something the automation cannot supply, do it yourself and release with "mark step done". "Resume" ${step.risk === 'read' ? 'retries the read step' : 'only rechecks the state and will never repeat this write'}; or abort.`,
             step,
             index,
           );
@@ -734,7 +757,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
                 observed: res.notes,
               });
             }
-            if (res.disposition === 'resume') await runAction(step, step.action, step.timeoutMs);
+            if (mayReissueAfterHandoff(step.risk, res.disposition)) await runAction(step, step.action, step.timeoutMs);
             // Whatever the operator says they did, the checkpoint is what
             // decides. A human claiming "done" does not skip verification.
             cp = await surface.evaluate(step.checkpoint, step.timeoutMs);

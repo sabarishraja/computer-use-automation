@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PolicyEngine, DEFAULT_ACTION_TYPES, DEFAULT_IRREVERSIBLE_HINTS } from '../src/policy/guardrails.js';
 import { Redactor } from '../src/policy/redaction.js';
-import { inputSchema, coerceOutput, RETRYABLE } from '../src/replay/contract.js';
+import { inputSchema, coerceOutput, RETRYABLE, retryableFor, mayReissueAfterHandoff } from '../src/replay/contract.js';
 
 const engine = (over: Partial<ConstructorParameters<typeof PolicyEngine>[0]> = {}) =>
   new PolicyEngine({
@@ -110,6 +110,13 @@ describe('redaction', () => {
     expect(out.detail.input).not.toBe('123456');
   });
 
+  it('redacts registered numeric inputs without changing public numbers', () => {
+    const r = new Redactor();
+    r.register(4820.15, 'financial');
+    const out = r.json({ openingDeposit: 4820.15, step: 2 });
+    expect(out).toEqual({ openingDeposit: '[redacted:financial]', step: 2 });
+  });
+
   it('returns financial data to the caller but not to evidence', () => {
     const r = new Redactor();
     const { forCaller, forEvidence } = r.partitionOutputs(
@@ -162,15 +169,28 @@ describe('input contract', () => {
 });
 
 describe('failure taxonomy', () => {
+  it('never automatically reissues a write after operator handoff', () => {
+    expect(mayReissueAfterHandoff('read', 'resume')).toBe(true);
+    expect(mayReissueAfterHandoff('write_reversible', 'resume')).toBe(false);
+    expect(mayReissueAfterHandoff('write_irreversible', 'resume')).toBe(false);
+    expect(mayReissueAfterHandoff('read', 'resume_step_done')).toBe(false);
+  });
   it('marks caller-fault and post-write failures as not retryable', () => {
     expect(RETRYABLE.input_validation).toBe(false);
     expect(RETRYABLE.policy_denied).toBe(false);
     expect(RETRYABLE.checkpoint_failed).toBe(false);
     expect(RETRYABLE.operator_aborted).toBe(false);
+    expect(RETRYABLE.action_failed).toBe(false);
   });
 
   it('marks transient conditions as retryable', () => {
     expect(RETRYABLE.timeout).toBe(true);
     expect(RETRYABLE.app_error).toBe(true);
+  });
+
+  it('does not advise an unattended retry after an uncertain write', () => {
+    expect(retryableFor('app_error', 'write_reversible')).toBe(false);
+    expect(retryableFor('timeout', 'write_irreversible')).toBe(false);
+    expect(retryableFor('app_error', 'read')).toBe(true);
   });
 });
